@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+## [1.10.2] - 2026-05-19
+
 ### Changed
 - Rewrote the README to present stable inline calculations, cross-note references, and recent Numerals features without beta labeling.
 - Moved the legacy source colocated Numerals test into the Jest-covered `tests/` directory.
