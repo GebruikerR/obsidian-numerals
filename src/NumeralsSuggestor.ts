@@ -12,6 +12,7 @@ import {
  } from "obsidian";
 import { getMathJsSymbols } from "./mathjsUtilities";
 import { findInlineNumeralsContext } from "./inlineSuggestorUtils";
+import { getInlineTriggers } from "./inline/inlineParser";
 
 const greekSymbols = [
     { trigger: 'alpha', symbol: 'α' },
@@ -159,8 +160,7 @@ export class NumeralsSuggestor extends EditorSuggest<string> {
 		const inlineCtx = findInlineNumeralsContext(
 			currentLine,
 			cursor.ch,
-			this.plugin.settings.inlineResultTrigger,
-			this.plugin.settings.inlineEquationTrigger,
+			getInlineTriggers(this.plugin.settings),
 		);
 
 		if (!inlineCtx) {
