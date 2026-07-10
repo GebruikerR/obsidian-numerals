@@ -4,7 +4,12 @@
  */
 
 import { handleResultInsertions } from '../src/numeralsUtilities';
-import { getLocaleFormatter } from '../src/numeralsUtilities';
+import {
+	createNumberFormatProfile,
+	createResultFormatter,
+	ResultFormatter,
+} from '../src/formatting';
+import { NumeralsNumberFormat } from '../src/numerals.types';
 import { App, MarkdownPostProcessorContext, MarkdownView } from 'obsidian';
 
 // Mock Obsidian types
@@ -23,7 +28,7 @@ describe('handleResultInsertions', () => {
 	let mockApp: Partial<App>;
 	let mockCtx: MockContext;
 	let mockEl: HTMLElement;
-	let numberFormat: any;
+	let formatter: ResultFormatter;
 
 	beforeEach(() => {
 		// Mock editor
@@ -55,8 +60,9 @@ describe('handleResultInsertions', () => {
 		// Mock element
 		mockEl = document.createElement('div');
 
-		// Number format
-		numberFormat = getLocaleFormatter();
+		formatter = createResultFormatter({
+			profile: createNumberFormatProfile(NumeralsNumberFormat.System),
+		});
 
 		// Clear setTimeout mock
 		jest.useFakeTimers();
@@ -76,7 +82,8 @@ describe('handleResultInsertions', () => {
 		handleResultInsertions(
 			results,
 			insertionLines,
-			numberFormat,
+			formatter,
+			{},
 			mockCtx as unknown as MarkdownPostProcessorContext,
 			mockApp as App,
 			mockEl
@@ -101,7 +108,8 @@ describe('handleResultInsertions', () => {
 		handleResultInsertions(
 			results,
 			insertionLines,
-			numberFormat,
+			formatter,
+			{},
 			mockCtx as unknown as MarkdownPostProcessorContext,
 			mockApp as App,
 			mockEl
@@ -127,7 +135,8 @@ describe('handleResultInsertions', () => {
 		handleResultInsertions(
 			results,
 			insertionLines,
-			numberFormat,
+			formatter,
+			{},
 			mockCtx as unknown as MarkdownPostProcessorContext,
 			mockApp as App,
 			mockEl
@@ -150,7 +159,8 @@ describe('handleResultInsertions', () => {
 		handleResultInsertions(
 			results,
 			insertionLines,
-			numberFormat,
+			formatter,
+			{},
 			mockCtx as unknown as MarkdownPostProcessorContext,
 			mockApp as App,
 			mockEl
@@ -171,7 +181,8 @@ describe('handleResultInsertions', () => {
 		handleResultInsertions(
 			results,
 			insertionLines,
-			numberFormat,
+			formatter,
+			{},
 			mockCtx as unknown as MarkdownPostProcessorContext,
 			mockApp as App,
 			mockEl
@@ -193,7 +204,8 @@ describe('handleResultInsertions', () => {
 		handleResultInsertions(
 			results,
 			insertionLines,
-			numberFormat,
+			formatter,
+			{},
 			mockCtx as unknown as MarkdownPostProcessorContext,
 			mockApp as App,
 			mockEl
@@ -213,7 +225,8 @@ describe('handleResultInsertions', () => {
 		handleResultInsertions(
 			results,
 			insertionLines,
-			numberFormat,
+			formatter,
+			{},
 			mockCtx as unknown as MarkdownPostProcessorContext,
 			mockApp as App,
 			mockEl
@@ -233,7 +246,8 @@ describe('handleResultInsertions', () => {
 		handleResultInsertions(
 			results,
 			insertionLines,
-			numberFormat,
+			formatter,
+			{},
 			mockCtx as unknown as MarkdownPostProcessorContext,
 			mockApp as App,
 			mockEl
@@ -255,7 +269,8 @@ describe('handleResultInsertions', () => {
 		handleResultInsertions(
 			results,
 			insertionLines,
-			numberFormat,
+			formatter,
+			{},
 			mockCtx as unknown as MarkdownPostProcessorContext,
 			mockApp as App,
 			mockEl
@@ -275,7 +290,8 @@ describe('handleResultInsertions', () => {
 		handleResultInsertions(
 			results,
 			insertionLines,
-			numberFormat,
+			formatter,
+			{},
 			mockCtx as unknown as MarkdownPostProcessorContext,
 			mockApp as App,
 			mockEl
@@ -296,7 +312,8 @@ describe('handleResultInsertions', () => {
 		handleResultInsertions(
 			results,
 			insertionLines,
-			numberFormat,
+			formatter,
+			{},
 			mockCtx as unknown as MarkdownPostProcessorContext,
 			mockApp as App,
 			mockEl
@@ -310,6 +327,31 @@ describe('handleResultInsertions', () => {
 		expect(call[1]).toMatch(/@\[value::\d+/);
 	});
 
+	it('should apply block format overrides to inserted results', () => {
+		const results = [1.2];
+		const insertionLines = [0];
+
+		mockCtx.getSectionInfo.mockReturnValue({ lineStart: 0 });
+		mockEditor.getLine.mockReturnValue('@[value]');
+
+		handleResultInsertions(
+			results,
+			insertionLines,
+			formatter,
+			{
+				numberFormat: NumeralsNumberFormat.Fixed,
+				decimalPlaces: 2,
+			},
+			mockCtx as unknown as MarkdownPostProcessorContext,
+			mockApp as App,
+			mockEl
+		);
+
+		jest.runAllTimers();
+
+		expect(mockEditor.setLine).toHaveBeenCalledWith(1, '@[value::1.20]');
+	});
+
 	it('should preserve text after insertion directive', () => {
 		const results = [99];
 		const insertionLines = [0];
@@ -320,7 +362,8 @@ describe('handleResultInsertions', () => {
 		handleResultInsertions(
 			results,
 			insertionLines,
-			numberFormat,
+			formatter,
+			{},
 			mockCtx as unknown as MarkdownPostProcessorContext,
 			mockApp as App,
 			mockEl
@@ -344,7 +387,8 @@ describe('handleResultInsertions', () => {
 		handleResultInsertions(
 			results,
 			insertionLines,
-			numberFormat,
+			formatter,
+			{},
 			mockCtx as unknown as MarkdownPostProcessorContext,
 			mockApp as App,
 			mockEl
@@ -376,7 +420,8 @@ describe('handleResultInsertions', () => {
 		handleResultInsertions(
 			results,
 			insertionLines,
-			numberFormat,
+			formatter,
+			{},
 			mockCtx as unknown as MarkdownPostProcessorContext,
 			mockApp as App,
 			mockEl
@@ -403,7 +448,8 @@ describe('handleResultInsertions', () => {
 		handleResultInsertions(
 			results,
 			insertionLines,
-			numberFormat,
+			formatter,
+			{},
 			mockCtx as unknown as MarkdownPostProcessorContext,
 			mockApp as App,
 			mockEl

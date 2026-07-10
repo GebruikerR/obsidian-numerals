@@ -254,6 +254,21 @@ Configure how rendered numbers are displayed:
 - **Engineering**: exponent is a multiple of 3.
 - **Formatted**: choose a specific thousands/decimal style.
 
+Override formatting for one math block with display-only directives:
+
+````markdown
+```math
+@format comma-period
+@decimalPlaces 2
+subtotal = 1234.5
+third = 1 / 3
+```
+````
+
+`@format` accepts `system`, `fixed`, `exponential` (or `scientific`), `engineering`, `comma-period`, `period-comma`, `space-comma`, and `indian`. `@decimalPlaces` accepts an integer from 0 through 20; `@decimalPlace` is also accepted.
+
+These directives change displayed and inserted results, not values in calculation scope. For computational rounding, use mathjs directly: `round(value, 2)` for numbers or `round(amount, 2, GBP)` for currency Units.
+
 ## Installation
 
 Install **Numerals** from Obsidian's Community Plugins browser.

@@ -1,6 +1,6 @@
-import * as math from 'mathjs';
 import { App, MarkdownPostProcessorContext } from 'obsidian';
-import { NumeralsLayout, NumeralsRenderStyle, NumeralsSettings, NumeralsError, NumeralsBlockResult, mathjsFormat, NumeralsScope, StringReplaceMap, ProcessedBlock, EvaluationResult, RenderContext } from '../numerals.types';
+import { NumeralsLayout, NumeralsRenderStyle, NumeralsSettings, NumeralsError, NumeralsBlockResult, NumeralsScope, StringReplaceMap, ProcessedBlock, EvaluationResult, RenderContext } from '../numerals.types';
+import type { ResultFormatOverrides, ResultFormatter } from '../formatting';
 import { RendererFactory } from '../renderers';
 import { getScopeFromFrontmatter } from '../processing/scope';
 import { preProcessBlockForNumeralsDirectives } from '../processing/preprocessor';
@@ -94,7 +94,7 @@ export function renderNumeralsBlock(
  *
  * @param results - Array of evaluated results
  * @param insertionLines - Array of line indices that have insertion directives
- * @param numberFormat - Format specification for displaying numbers
+ * @param formatter - Shared result formatter
  * @param ctx - Markdown post processor context (provides section info)
  * @param app - Obsidian App instance (provides editor access)
  * @param el - The HTML element being rendered (used to get section info)
@@ -124,7 +124,8 @@ export function renderNumeralsBlock(
 export function handleResultInsertions(
 	results: unknown[],
 	insertionLines: number[],
-	numberFormat: mathjsFormat,
+	formatter: ResultFormatter,
+	formatOverrides: ResultFormatOverrides,
 	ctx: MarkdownPostProcessorContext,
 	app: App,
 	el: HTMLElement
@@ -151,7 +152,7 @@ export function handleResultInsertions(
 
 		const curLine = lineStart + i + 1;
 		const sourceLine = editor.getLine(curLine);
-		const insertionValue = math.format(results[i], numberFormat);
+		const insertionValue = formatter.format(results[i], formatOverrides).canonical;
 
 		// Replace @[variable] or @[variable::oldValue] with @[variable::newValue]
 		const modifiedSource = sourceLine.replace(
@@ -186,7 +187,7 @@ export function handleResultInsertions(
  * @param settings - A NumeralsSettings object that provides settings for the rendering process. These   
  * settings can control aspects such as the layout style, whether to alternate row colors, and whether   
  * to hide lines without markup when emitting.  
- * @param numberFormat - A mathjsFormat function that is used to format numbers in the Numerals block.  
+ * @param formatter - Shared formatter used for all result output.
  * @param preProcessors - An array of StringReplaceMap objects that specify text replacements to be   
  * made in the source string before it is processed.  
  * @param app - The Obsidian App instance.
@@ -201,7 +202,7 @@ export function processAndRenderNumeralsBlockFromSource(
 	metadata: {[key: string]: unknown} | undefined,
 	type: NumeralsRenderStyle | undefined,
 	settings: NumeralsSettings,
-	numberFormat: mathjsFormat,
+	formatter: ResultFormatter,
 	preProcessors: StringReplaceMap[],
 	app: App
 ): NumeralsBlockResult {
@@ -232,6 +233,17 @@ export function processAndRenderNumeralsBlockFromSource(
 
 	// Phase 2: Preprocess (using cross-note resolved source)
 	const processedBlock = preProcessBlockForNumeralsDirectives(crossNoteResult.resolvedSource, preProcessors);
+	if (processedBlock.invalidFormatDirectives.length > 0) {
+		applyBlockStyles({ el, settings, blockRenderStyle });
+		const directiveError = processedBlock.invalidFormatDirectives[0];
+		renderError(el, {
+			results: [],
+			inputs: [],
+			errorMsg: new NumeralsError('Formatting Directive Error', directiveError.message),
+			errorInput: directiveError.source,
+		});
+		return { scope: new NumeralsScope(), referencedPaths: crossNoteResult.referencedPaths };
+	}
 
 	// Phase 3: Apply block styles
 	applyBlockStyles({
@@ -259,7 +271,8 @@ export function processAndRenderNumeralsBlockFromSource(
 	handleResultInsertions(
 		evaluationResult.results,
 		processedBlock.blockInfo.insertion_lines,
-		numberFormat,
+		formatter,
+		processedBlock.formatOverrides,
 		ctx,
 		app,
 		el
@@ -269,7 +282,8 @@ export function processAndRenderNumeralsBlockFromSource(
 	const renderContext: RenderContext = {
 		renderStyle: blockRenderStyle,
 		settings,
-		numberFormat,
+		formatter,
+		formatOverrides: processedBlock.formatOverrides,
 		preProcessors,
 	};
 

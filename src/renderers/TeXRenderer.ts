@@ -1,7 +1,7 @@
 import { LineRenderData, RenderContext } from '../numerals.types';
 import { BaseLineRenderer } from './BaseLineRenderer';
 import { mathjaxLoop } from '../rendering/displayUtils';
-import { expressionToTeX, resultToTeX } from '../rendering/texRendering';
+import { expressionToTeX } from '../rendering/texRendering';
 
 /**
  * TeX renderer for Numerals blocks.
@@ -94,7 +94,10 @@ export class TeXRenderer extends BaseLineRenderer {
 		lineData: LineRenderData,
 		context: RenderContext
 	): void {
-		const texResult = resultToTeX(lineData.result, context.preProcessors);
+		const texResult = context.formatter.format(
+			lineData.result,
+			context.formatOverrides
+		).tex;
 
 		// Render with MathJax
 		const resultTexElement = resultElement.createEl('span', { cls: 'numerals-tex' });

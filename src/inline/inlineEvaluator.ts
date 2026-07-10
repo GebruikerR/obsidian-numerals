@@ -1,6 +1,6 @@
 import * as math from 'mathjs';
 import { App } from 'obsidian';
-import { NumeralsScope, NumeralsSettings, mathjsFormat, StringReplaceMap, InlineEvaluationResult } from '../numerals.types';
+import { NumeralsScope, NumeralsSettings, StringReplaceMap, InlineEvaluationResult } from '../numerals.types';
 import { replaceStringsInTextFromMap } from '../processing/preprocessor';
 import { resolveCrossNoteReferences } from '../processing/crossNoteResolver';
 
@@ -9,25 +9,24 @@ import { resolveCrossNoteReferences } from '../processing/crossNoteResolver';
  *
  * Applies preprocessors (currency symbols, thousands separators),
  * handles the `@prev` directive (substituted to `__prev`),
- * evaluates via mathjs, and formats the result. The scope is cloned
+ * evaluates via mathjs, and returns the raw result. The scope is cloned
  * to prevent inline expressions from polluting the shared scope.
  *
  * @param expression - The math expression to evaluate (trigger prefix already stripped)
  * @param scope - Variable scope (note-globals + frontmatter)
- * @param numberFormat - mathjs format options for result display
  * @param preProcessors - String replacement rules (currency, thousands, etc.)
  * @param prevResult - The raw result of the previous inline expression (for @prev support).
  *                     Pass `undefined` when there is no previous result.
  * @param app - The Obsidian App instance (optional; required for cross-note references)
  * @param sourcePath - Path of the current file (optional; required for cross-note references)
  * @param settings - Numerals settings (optional; required for cross-note references)
- * @returns Object with `formatted` (display string) and `raw` (mathjs value for chaining)
+ * @returns The raw mathjs value and evaluation metadata. Display formatting is
+ * handled by the rendering layer.
  * @throws If mathjs cannot evaluate the expression, or @prev is used without a previous result
  */
 export function evaluateInlineExpression(
 	expression: string,
 	scope: NumeralsScope,
-	numberFormat: mathjsFormat,
 	preProcessors: StringReplaceMap[],
 	prevResult?: unknown,
 	app?: App,
@@ -76,10 +75,6 @@ export function evaluateInlineExpression(
 		throw new Error('Expression produced no result');
 	}
 
-	const formatted = numberFormat !== undefined
-		? math.format(result, numberFormat)
-		: math.format(result);
-
 	// Extract note-global ($-prefixed) variable assignments.
 	// Compare the local scope against the original to find new or changed $-keys.
 	const globals = new Map<string, unknown>();
@@ -89,5 +84,5 @@ export function evaluateInlineExpression(
 		}
 	}
 
-	return { formatted, raw: result, processedExpression: processed, globals, referencedPaths };
+	return { raw: result, processedExpression: processed, globals, referencedPaths };
 }

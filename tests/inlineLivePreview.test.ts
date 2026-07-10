@@ -27,12 +27,21 @@ import {
 	selectionOverlapsRange,
 } from '../src/inline/inlineLivePreview';
 import { InlineNumeralsMode, NumeralsRenderStyle } from '../src/numerals.types';
+import type { FormattedResult } from '../src/formatting';
 import { EditorSelection } from '@codemirror/state';
 import { renderMath } from 'obsidian';
 
 beforeAll(() => {
 	(globalThis as { activeDocument?: Document }).activeDocument = document;
 });
+
+function formatted(
+	text: string,
+	tex: string = text,
+	canonical: string = text,
+): FormattedResult {
+	return { text, tex, canonical };
+}
 
 // ---------------------------------------------------------------------------
 // getFormattingClasses
@@ -125,7 +134,7 @@ describe('InlineNumeralsWidget', () => {
 	describe('toDOM', () => {
 		it('should render result-only mode with value span', () => {
 			const widget = new InlineNumeralsWidget(
-				'36 in', InlineNumeralsMode.ResultOnly, '3ft in inches', ' = ', false
+				formatted('36 in'), InlineNumeralsMode.ResultOnly, '3ft in inches', ' = ', false
 			);
 			const el = widget.toDOM();
 
@@ -140,8 +149,8 @@ describe('InlineNumeralsWidget', () => {
 
 		it('should render result-only TeX mode with MathJax inside the value span', async () => {
 			const widget = new InlineNumeralsWidget(
-				'36', InlineNumeralsMode.ResultOnly, '3ft in inches', ' = ', false,
-				[], NumeralsRenderStyle.TeX, 36, '3 ft in inches', []
+				formatted('36', '36'), InlineNumeralsMode.ResultOnly, '3ft in inches', ' = ', false,
+				[], NumeralsRenderStyle.TeX, '3 ft in inches'
 			);
 			const el = widget.toDOM();
 			await Promise.resolve();
@@ -152,7 +161,7 @@ describe('InlineNumeralsWidget', () => {
 
 		it('should render equation mode with input, separator, and value spans', () => {
 			const widget = new InlineNumeralsWidget(
-				'5 ft', InlineNumeralsMode.Equation, '3ft + 2ft', ' = ', false
+				formatted('5 ft'), InlineNumeralsMode.Equation, '3ft + 2ft', ' = ', false
 			);
 			const el = widget.toDOM();
 
@@ -169,8 +178,8 @@ describe('InlineNumeralsWidget', () => {
 				throw new Error('MathJax unavailable');
 			});
 			const widget = new InlineNumeralsWidget(
-				'36', InlineNumeralsMode.ResultOnly, '3ft in inches', ' = ', false,
-				[], NumeralsRenderStyle.TeX, 36, '3 ft in inches', []
+				formatted('36', '36'), InlineNumeralsMode.ResultOnly, '3ft in inches', ' = ', false,
+				[], NumeralsRenderStyle.TeX, '3 ft in inches'
 			);
 			const el = widget.toDOM();
 			await Promise.resolve();
@@ -180,8 +189,8 @@ describe('InlineNumeralsWidget', () => {
 
 		it('should render equation TeX mode with MathJax input and value spans', async () => {
 			const widget = new InlineNumeralsWidget(
-				'12', InlineNumeralsMode.Equation, 'sqrt(144)', ' = ', false,
-				[], NumeralsRenderStyle.TeX, 12, 'sqrt(144)', []
+				formatted('12', '12'), InlineNumeralsMode.Equation, 'sqrt(144)', ' = ', false,
+				[], NumeralsRenderStyle.TeX, 'sqrt(144)'
 			);
 			const el = widget.toDOM();
 			await Promise.resolve();
@@ -195,7 +204,7 @@ describe('InlineNumeralsWidget', () => {
 			const editorDocument = document.implementation.createHTMLDocument('editor');
 			const editorDom = editorDocument.createElement('div');
 			const widget = new InlineNumeralsWidget(
-				'5 ft', InlineNumeralsMode.Equation, '3ft + 2ft', ' = ', false
+				formatted('5 ft'), InlineNumeralsMode.Equation, '3ft + 2ft', ' = ', false
 			);
 
 			const el = widget.toDOM({ dom: editorDom } as unknown as Parameters<InlineNumeralsWidget['toDOM']>[0]);
@@ -208,7 +217,7 @@ describe('InlineNumeralsWidget', () => {
 
 		it('should render error mode with raw expression', () => {
 			const widget = new InlineNumeralsWidget(
-				'', InlineNumeralsMode.ResultOnly, 'bad expression', ' = ', true
+				formatted(''), InlineNumeralsMode.ResultOnly, 'bad expression', ' = ', true
 			);
 			const el = widget.toDOM();
 
@@ -219,7 +228,7 @@ describe('InlineNumeralsWidget', () => {
 
 		it('should apply formatting classes (bold)', () => {
 			const widget = new InlineNumeralsWidget(
-				'5', InlineNumeralsMode.ResultOnly, '3+2', ' = ', false, ['cm-strong']
+				formatted('5'), InlineNumeralsMode.ResultOnly, '3+2', ' = ', false, ['cm-strong']
 			);
 			const el = widget.toDOM();
 
@@ -229,7 +238,7 @@ describe('InlineNumeralsWidget', () => {
 
 		it('should apply multiple formatting classes', () => {
 			const widget = new InlineNumeralsWidget(
-				'5', InlineNumeralsMode.ResultOnly, '3+2', ' = ', false,
+				formatted('5'), InlineNumeralsMode.ResultOnly, '3+2', ' = ', false,
 				['cm-strong', 'cm-em', 'cm-highlight']
 			);
 			const el = widget.toDOM();
@@ -241,7 +250,7 @@ describe('InlineNumeralsWidget', () => {
 
 		it('should apply formatting classes even on error widgets', () => {
 			const widget = new InlineNumeralsWidget(
-				'', InlineNumeralsMode.ResultOnly, 'bad', ' = ', true, ['cm-em']
+				formatted(''), InlineNumeralsMode.ResultOnly, 'bad', ' = ', true, ['cm-em']
 			);
 			const el = widget.toDOM();
 
@@ -252,76 +261,75 @@ describe('InlineNumeralsWidget', () => {
 
 	describe('eq', () => {
 		it('should return true for identical widgets', () => {
-			const a = new InlineNumeralsWidget('5', InlineNumeralsMode.ResultOnly, '3+2', ' = ', false);
-			const b = new InlineNumeralsWidget('5', InlineNumeralsMode.ResultOnly, '3+2', ' = ', false);
+			const a = new InlineNumeralsWidget(formatted('5'), InlineNumeralsMode.ResultOnly, '3+2', ' = ', false);
+			const b = new InlineNumeralsWidget(formatted('5'), InlineNumeralsMode.ResultOnly, '3+2', ' = ', false);
 			expect(a.eq(b)).toBe(true);
 		});
 
 		it('should return false when result differs', () => {
-			const a = new InlineNumeralsWidget('5', InlineNumeralsMode.ResultOnly, '3+2', ' = ', false);
-			const b = new InlineNumeralsWidget('6', InlineNumeralsMode.ResultOnly, '3+2', ' = ', false);
+			const a = new InlineNumeralsWidget(formatted('5'), InlineNumeralsMode.ResultOnly, '3+2', ' = ', false);
+			const b = new InlineNumeralsWidget(formatted('6'), InlineNumeralsMode.ResultOnly, '3+2', ' = ', false);
 			expect(a.eq(b)).toBe(false);
 		});
 
 		it('should return false when mode differs', () => {
-			const a = new InlineNumeralsWidget('5', InlineNumeralsMode.ResultOnly, '3+2', ' = ', false);
-			const b = new InlineNumeralsWidget('5', InlineNumeralsMode.Equation, '3+2', ' = ', false);
+			const a = new InlineNumeralsWidget(formatted('5'), InlineNumeralsMode.ResultOnly, '3+2', ' = ', false);
+			const b = new InlineNumeralsWidget(formatted('5'), InlineNumeralsMode.Equation, '3+2', ' = ', false);
 			expect(a.eq(b)).toBe(false);
 		});
 
 		it('should return false when expression differs', () => {
-			const a = new InlineNumeralsWidget('5', InlineNumeralsMode.ResultOnly, '3+2', ' = ', false);
-			const b = new InlineNumeralsWidget('5', InlineNumeralsMode.ResultOnly, '2+3', ' = ', false);
+			const a = new InlineNumeralsWidget(formatted('5'), InlineNumeralsMode.ResultOnly, '3+2', ' = ', false);
+			const b = new InlineNumeralsWidget(formatted('5'), InlineNumeralsMode.ResultOnly, '2+3', ' = ', false);
 			expect(a.eq(b)).toBe(false);
 		});
 
 		it('should return false when error state differs', () => {
-			const a = new InlineNumeralsWidget('', InlineNumeralsMode.ResultOnly, 'x', ' = ', false);
-			const b = new InlineNumeralsWidget('', InlineNumeralsMode.ResultOnly, 'x', ' = ', true);
+			const a = new InlineNumeralsWidget(formatted(''), InlineNumeralsMode.ResultOnly, 'x', ' = ', false);
+			const b = new InlineNumeralsWidget(formatted(''), InlineNumeralsMode.ResultOnly, 'x', ' = ', true);
 			expect(a.eq(b)).toBe(false);
 		});
 
 		it('should return false when separator differs', () => {
-			const a = new InlineNumeralsWidget('5', InlineNumeralsMode.Equation, '3+2', ' = ', false);
-			const b = new InlineNumeralsWidget('5', InlineNumeralsMode.Equation, '3+2', ' \u2192 ', false);
+			const a = new InlineNumeralsWidget(formatted('5'), InlineNumeralsMode.Equation, '3+2', ' = ', false);
+			const b = new InlineNumeralsWidget(formatted('5'), InlineNumeralsMode.Equation, '3+2', ' \u2192 ', false);
 			expect(a.eq(b)).toBe(false);
 		});
 
 		it('should return false when formatting classes differ', () => {
-			const a = new InlineNumeralsWidget('5', InlineNumeralsMode.ResultOnly, '3+2', ' = ', false, ['cm-strong']);
-			const b = new InlineNumeralsWidget('5', InlineNumeralsMode.ResultOnly, '3+2', ' = ', false, []);
+			const a = new InlineNumeralsWidget(formatted('5'), InlineNumeralsMode.ResultOnly, '3+2', ' = ', false, ['cm-strong']);
+			const b = new InlineNumeralsWidget(formatted('5'), InlineNumeralsMode.ResultOnly, '3+2', ' = ', false, []);
 			expect(a.eq(b)).toBe(false);
 		});
 
 		it('should return true when formatting classes match', () => {
-			const a = new InlineNumeralsWidget('5', InlineNumeralsMode.ResultOnly, '3+2', ' = ', false, ['cm-strong', 'cm-em']);
-			const b = new InlineNumeralsWidget('5', InlineNumeralsMode.ResultOnly, '3+2', ' = ', false, ['cm-strong', 'cm-em']);
+			const a = new InlineNumeralsWidget(formatted('5'), InlineNumeralsMode.ResultOnly, '3+2', ' = ', false, ['cm-strong', 'cm-em']);
+			const b = new InlineNumeralsWidget(formatted('5'), InlineNumeralsMode.ResultOnly, '3+2', ' = ', false, ['cm-strong', 'cm-em']);
 			expect(a.eq(b)).toBe(true);
 		});
 
-		it('should return true when only the rawResult object identity differs', () => {
-			// mathjs results (e.g. Unit objects) are fresh instances on every
-			// evaluation pass; comparing them by reference would force a DOM
-			// rebuild (and MathJax re-render) on every cursor move.
+		it('should return true for distinct but equivalent formatted result objects', () => {
 			const a = new InlineNumeralsWidget(
-				'5 m', InlineNumeralsMode.ResultOnly, '2m+3m', ' = ', false,
-				[], NumeralsRenderStyle.TeX, { value: 5 }, '2m+3m', []
+				formatted('5 m', '5~\\mathrm{m}', '5 m'),
+				InlineNumeralsMode.ResultOnly, '2m+3m', ' = ', false,
+				[], NumeralsRenderStyle.TeX, '2m+3m'
 			);
 			const b = new InlineNumeralsWidget(
-				'5 m', InlineNumeralsMode.ResultOnly, '2m+3m', ' = ', false,
-				[], NumeralsRenderStyle.TeX, { value: 5 }, '2m+3m', []
+				formatted('5 m', '5~\\mathrm{m}', '5 m'),
+				InlineNumeralsMode.ResultOnly, '2m+3m', ' = ', false,
+				[], NumeralsRenderStyle.TeX, '2m+3m'
 			);
 			expect(a.eq(b)).toBe(true);
 		});
 
 		it('should return false when render style differs', () => {
 			const plain = new InlineNumeralsWidget(
-				'5', InlineNumeralsMode.ResultOnly, '3+2', ' = ', false,
-				[], NumeralsRenderStyle.Plain, 5, '3+2', []
+				formatted('5'), InlineNumeralsMode.ResultOnly, '3+2', ' = ', false,
+				[], NumeralsRenderStyle.Plain, '3+2'
 			);
 			const tex = new InlineNumeralsWidget(
-				'5', InlineNumeralsMode.ResultOnly, '3+2', ' = ', false,
-				[], NumeralsRenderStyle.TeX, 5, '3+2', []
+				formatted('5'), InlineNumeralsMode.ResultOnly, '3+2', ' = ', false,
+				[], NumeralsRenderStyle.TeX, '3+2'
 			);
 
 			expect(plain.eq(tex)).toBe(false);

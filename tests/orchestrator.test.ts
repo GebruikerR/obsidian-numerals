@@ -1,6 +1,6 @@
 import { renderError, renderNumeralsBlock } from '../src/numeralsUtilities';
-import { EvaluationResult, ProcessedBlock, RenderContext, NumeralsRenderStyle, NumeralsSettings, numeralsBlockInfo } from '../src/numerals.types';
-import * as math from 'mathjs';
+import { EvaluationResult, ProcessedBlock, RenderContext, NumeralsRenderStyle, NumeralsNumberFormat, NumeralsSettings, numeralsBlockInfo } from '../src/numerals.types';
+import { createNumberFormatProfile, createResultFormatter } from '../src/formatting';
 
 // Mock Obsidian functions before importing renderers
 jest.mock('obsidian', () => ({
@@ -98,7 +98,9 @@ describe('renderNumeralsBlock', () => {
 		processedBlock = {
 			rawRows: ['1 + 1', '2 + 2', '3 + 3'],
 			processedSource: '1 + 1\n2 + 2\n3 + 3',
-			blockInfo
+			blockInfo,
+			formatOverrides: {},
+			invalidFormatDirectives: [],
 		};
 
 		settings = {
@@ -109,7 +111,10 @@ describe('renderNumeralsBlock', () => {
 		context = {
 			renderStyle: NumeralsRenderStyle.Plain,
 			settings,
-			numberFormat: math.format,
+			formatter: createResultFormatter({
+				profile: createNumberFormatProfile(NumeralsNumberFormat.System, 'en-US'),
+			}),
+			formatOverrides: {},
 			preProcessors: []
 		};
 	});

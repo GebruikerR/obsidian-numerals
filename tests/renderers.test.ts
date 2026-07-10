@@ -31,10 +31,11 @@ import {
 	LineRenderData,
 	RenderContext,
 	NumeralsRenderStyle,
+	NumeralsNumberFormat,
 	DEFAULT_SETTINGS,
 } from '../src/numerals.types';
 import { expressionToTeX, resultToTeX } from '../src/rendering/texRendering';
-import { getLocaleFormatter } from '../src/numeralsUtilities';
+import { createNumberFormatProfile, createResultFormatter } from '../src/formatting';
 
 // Mock Obsidian DOM methods
 beforeAll(() => {
@@ -82,7 +83,10 @@ describe('Renderer Implementations', () => {
 		context = {
 			renderStyle: NumeralsRenderStyle.Plain,
 			settings: DEFAULT_SETTINGS,
-			numberFormat: getLocaleFormatter(),
+			formatter: createResultFormatter({
+				profile: createNumberFormatProfile(NumeralsNumberFormat.System),
+			}),
+			formatOverrides: {},
 			preProcessors: [],
 		};
 	});

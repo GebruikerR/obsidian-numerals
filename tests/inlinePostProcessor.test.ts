@@ -30,11 +30,17 @@ import {
 	NumeralsSettings,
 	NumeralsScope,
 	DEFAULT_SETTINGS,
+	NumeralsNumberFormat,
 	StringReplaceMap,
 } from '../src/numerals.types';
 import { parseInlineExpression } from '../src/inline/inlineParser';
 import { evaluateInlineExpression } from '../src/inline/inlineEvaluator';
 import { createInlineNumeralsPostProcessor } from '../src/inline/inlinePostProcessor';
+import {
+	createNumberFormatProfile,
+	createResultFormatter,
+	type ResultFormatter,
+} from '../src/formatting';
 
 const mockRegisteredEvents: unknown[] = [];
 
@@ -92,6 +98,15 @@ for (const moneyType of defaultCurrencyMap) {
 	}
 }
 
+function testFormatter(
+	processors: StringReplaceMap[] = preProcessors,
+): ResultFormatter {
+	return createResultFormatter({
+		profile: createNumberFormatProfile(NumeralsNumberFormat.System, 'en-US'),
+		preProcessors: processors,
+	});
+}
+
 // ---------------------------------------------------------------------------
 // Helper: simulate the full inline pipeline (parse → evaluate → format)
 // ---------------------------------------------------------------------------
@@ -108,14 +123,17 @@ function simulateInlinePipeline(
 	});
 	if (!parsed) return null;
 
-	const { formatted } = evaluateInlineExpression(
+	const result = evaluateInlineExpression(
 		parsed.expression,
 		scope,
-		undefined,
 		preProcessors
 	);
 
-	return { mode: parsed.mode, expression: parsed.expression, result: formatted };
+	return {
+		mode: parsed.mode,
+		expression: parsed.expression,
+		result: testFormatter().format(result.raw).text,
+	};
 }
 
 // ---------------------------------------------------------------------------
@@ -171,7 +189,7 @@ describe('inline numerals integration', () => {
 			return createInlineNumeralsPostProcessor(
 				app as any,
 				() => DEFAULT_SETTINGS,
-				() => undefined,
+				() => testFormatter(preProcessors),
 				() => preProcessors,
 				new Map(),
 			);
@@ -271,7 +289,7 @@ describe('inline numerals integration', () => {
 			});
 			expect(parsed).not.toBeNull();
 			expect(() => {
-				evaluateInlineExpression(parsed!.expression, new NumeralsScope(), undefined, []);
+				evaluateInlineExpression(parsed!.expression, new NumeralsScope(), []);
 			}).toThrow();
 		});
 	});
@@ -315,7 +333,7 @@ describe('inline post-processor cross-note references', () => {
 		const postProcessor = createInlineNumeralsPostProcessor(
 			app as any,
 			() => DEFAULT_SETTINGS,
-			() => undefined,
+			() => testFormatter([]),
 			() => [],
 			new Map(),
 		);
@@ -340,13 +358,13 @@ describe('inline note-global ($) variable chaining', () => {
 
 	describe('globals extracted from inline evaluation', () => {
 		it('should return $x in globals when assigning $x = 10', () => {
-			const result = evaluateInlineExpression('$x = 10', new NumeralsScope(), undefined, []);
+			const result = evaluateInlineExpression('$x = 10', new NumeralsScope(), []);
 			expect(result.globals.size).toBe(1);
 			expect(result.globals.get('$x')).toBe(10);
 		});
 
 		it('should return no globals for non-$ assignment', () => {
-			const result = evaluateInlineExpression('y = 10', new NumeralsScope(), undefined, []);
+			const result = evaluateInlineExpression('y = 10', new NumeralsScope(), []);
 			expect(result.globals.size).toBe(0);
 		});
 	});
@@ -357,26 +375,26 @@ describe('inline note-global ($) variable chaining', () => {
 			const scope = new NumeralsScope();
 
 			// First expression defines $apples
-			const r1 = evaluateInlineExpression('$apples = 100', scope, undefined, []);
+			const r1 = evaluateInlineExpression('$apples = 100', scope, []);
 			// Post-processor would inject globals into shared scope
 			for (const [k, v] of r1.globals) { scope.set(k, v); }
 
 			// Second expression uses $apples
-			const r2 = evaluateInlineExpression('$apples * 2', scope, undefined, []);
-			expect(r2.formatted).toBe('200');
+			const r2 = evaluateInlineExpression('$apples * 2', scope, []);
+			expect(r2.raw).toBe(200);
 		});
 
 		it('should chain three globals sequentially', () => {
 			const scope = new NumeralsScope();
 
-			const r1 = evaluateInlineExpression('$a = 10', scope, undefined, []);
+			const r1 = evaluateInlineExpression('$a = 10', scope, []);
 			for (const [k, v] of r1.globals) { scope.set(k, v); }
 
-			const r2 = evaluateInlineExpression('$b = $a * 3', scope, undefined, []);
+			const r2 = evaluateInlineExpression('$b = $a * 3', scope, []);
 			for (const [k, v] of r2.globals) { scope.set(k, v); }
 
-			const r3 = evaluateInlineExpression('$a + $b', scope, undefined, []);
-			expect(r3.formatted).toBe('40');
+			const r3 = evaluateInlineExpression('$a + $b', scope, []);
+			expect(r3.raw).toBe(40);
 		});
 	});
 
@@ -385,7 +403,7 @@ describe('inline note-global ($) variable chaining', () => {
 			const scopeCache = new Map<string, NumeralsScope>();
 			const scope = new NumeralsScope();
 
-			const result = evaluateInlineExpression('$price = 42', scope, undefined, []);
+			const result = evaluateInlineExpression('$price = 42', scope, []);
 			
 			// Simulate what the post-processor does after evaluation
 			if (result.globals.size > 0) {
@@ -409,12 +427,12 @@ describe('inline note-global ($) variable chaining', () => {
 		it('should support $total = @prev pattern', () => {
 			const scope = new NumeralsScope();
 
-			const r1 = evaluateInlineExpression('100 * 1.2', scope, undefined, []);
-			const r2 = evaluateInlineExpression('$total = @prev * 1.08', scope, undefined, [], r1.raw);
+			const r1 = evaluateInlineExpression('100 * 1.2', scope, []);
+			const r2 = evaluateInlineExpression('$total = @prev * 1.08', scope, [], r1.raw);
 			
 			expect(r2.globals.has('$total')).toBe(true);
 			// 100 * 1.2 * 1.08 = 129.6
-			expect(r2.formatted).toContain('129.6');
+			expect(testFormatter([]).format(r2.raw).text).toContain('129.6');
 		});
 	});
 });
