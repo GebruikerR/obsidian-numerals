@@ -137,9 +137,14 @@ A result is pure currency when its dimensions equal one active currency unit. Th
 
 Mathjs cannot remove registered units. Rebuilding the immutable registry changes which units receive currency presentation, even though stale mathjs unit definitions may remain until Obsidian reloads.
 
-## Currency presentation (PR 2)
+## Currency presentation
 
-PR 2 adds two independent settings:
+Currency presentation uses two independent, opt-in settings. Their persisted values are intentionally explicit:
+
+- `currencyPrecisionMode`: `follow-number-format` or `currency-standard`.
+- `currencyDisplayMode`: `code` or `symbol`.
+
+Older settings files omit these keys and inherit the compatibility defaults without being rewritten on load. Present but invalid values are repaired to the compatibility defaults. The custom decimal-place value must be an integer from 0 through 20; invalid persisted values are repaired to 2.
 
 ### Currency decimal places
 
@@ -152,7 +157,7 @@ Examples of standard digits:
 - JPY: 0
 - KWD: 3
 
-Custom/non-ISO currencies default to 2 and expose a validated custom decimal-place setting from 0 through 20.
+Custom currencies default to 2 and expose a validated custom decimal-place setting from 0 through 20. The custom value is only relevant when currency-standard precision is active.
 
 ### Currency display
 
@@ -170,6 +175,8 @@ Symbol placement comes from `Intl.NumberFormat.formatToParts()`. The formatter r
 - Result insertion continues using an ISO/custom unit code, never a display symbol.
 
 Compatibility defaults mean users see no currency presentation change until they opt in.
+
+Changing a currency presentation setting rebuilds the immutable registry and formatter immediately. The settings tab continues to use its imperative implementation so Numerals can retain its existing minimum Obsidian version.
 
 ## Rounding versus display formatting
 
@@ -209,7 +216,7 @@ PR 1 requirements:
 - No mathjs formatter or Unit internal is patched for presentation.
 - Only explicit block directives change output.
 
-PR 2 requirements:
+Currency-policy requirements:
 
 - Currency code and current number-format behavior remain the defaults.
 - Automatic currency digits and configured symbols are opt-in.

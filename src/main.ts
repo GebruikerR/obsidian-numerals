@@ -12,12 +12,15 @@ import { getMetadataForFileAtPath, addGlobalsFromScopeToPageCache } from "./proc
 import { createInlineNumeralsPostProcessor, createInlineLivePreviewExtension } from "./inline";
 import {
 	CurrencyType,
+	CurrencyDisplayMode,
+	CurrencyPrecisionMode,
 	NumeralsLayout,
 	NumeralsRenderStyle,
 	NumeralsSettings,
 	DEFAULT_SETTINGS,
 	NumeralsScope,
 	StringReplaceMap,
+	normalizeCurrencyFormattingSettings,
 } from "./numerals.types";
 import {
 	NumeralsSettingTab,
@@ -292,7 +295,13 @@ export default class NumeralsPlugin extends Plugin {
 
 	async loadSettings() {
 		const loadData = await this.loadData() as Partial<NumeralsSettings> & Record<string, unknown> | undefined;
+		let shouldSaveSettings = false;
 		if (loadData) {
+			if (normalizeCurrencyFormattingSettings(loadData)) {
+				console.warn('Numerals: Repaired invalid currency formatting settings');
+				shouldSaveSettings = true;
+			}
+
 			// Check for signature of old setting format, then port to new setting format
 			if (loadData.layoutStyle == undefined) {
 				const oldRenderStyleMap: Record<number, NumeralsLayout> = {
@@ -304,8 +313,7 @@ export default class NumeralsPlugin extends Plugin {
 				loadData.layoutStyle = oldRenderStyleMap[loadData['renderStyle'] as number];
 				if (loadData.layoutStyle) {
 					delete loadData['renderStyle'];
-					this.settings = loadData as NumeralsSettings;
-					void this.saveSettings();
+					shouldSaveSettings = true;
 				} else {
 					console.warn("Numerals: Error porting old layout style");
 				}
@@ -321,8 +329,7 @@ export default class NumeralsPlugin extends Plugin {
 
 				loadData.layoutStyle = oldLayoutStyleMap[loadData.layoutStyle as unknown as number];
 				if (loadData.layoutStyle) {
-					this.settings = loadData as NumeralsSettings;
-					void this.saveSettings();
+					shouldSaveSettings = true;
 				} else {
 					console.warn("Numerals: Error porting old layout style");
 				}
@@ -330,6 +337,9 @@ export default class NumeralsPlugin extends Plugin {
 		}
 
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, loadData);
+		if (shouldSaveSettings) {
+			await this.saveSettings();
+		}
 	}
 
 	async saveSettings() {
@@ -340,12 +350,22 @@ export default class NumeralsPlugin extends Plugin {
 		this.updateFormatting();
 	}
 
-	private updateFormatting(): void {
-		this.currencyRegistry = CurrencyRegistry.create(this.currencyMap);
+	updateFormatting(): void {
+		const customCurrencyCode = this.settings.customCurrencySymbol?.currency.trim();
+		const fractionDigitsByCode = customCurrencyCode
+			? new Map([[customCurrencyCode, this.settings.customCurrencyDecimalPlaces]])
+			: undefined;
+		this.currencyRegistry = CurrencyRegistry.create(this.currencyMap, {
+			fractionDigitsByCode,
+		});
 		this.resultFormatter = createResultFormatter({
 			profile: createNumberFormatProfile(this.settings.numberFormat),
 			currencies: this.currencyRegistry,
 			preProcessors: this.preProcessors,
+			currencyPrecisionMode: this.settings.currencyPrecisionMode ??
+				CurrencyPrecisionMode.FollowNumberFormat,
+			currencyDisplayMode: this.settings.currencyDisplayMode ??
+				CurrencyDisplayMode.Code,
 		});
 	}
 }

@@ -40,7 +40,7 @@ export interface FormattedResult {
 	text: string;
 	/** MathJax-ready TeX source. */
 	tex: string;
-	/** Persistable output. PR 1 intentionally preserves legacy text here. */
+	/** Persistable output; currency symbols are normalized to active unit codes. */
 	canonical: string;
 }
 

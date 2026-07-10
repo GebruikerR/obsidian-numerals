@@ -1,4 +1,8 @@
 import * as math from 'mathjs';
+import {
+	CurrencyDisplayMode,
+	CurrencyPrecisionMode,
+} from '../numerals.types';
 import type { StringReplaceMap } from '../numerals.types';
 import {
 	getLocaleFormatter,
@@ -13,6 +17,7 @@ import {
 } from './numberFormat';
 import type {
 	FormattedResult,
+	CurrencyMatch,
 	NumberFormatProfile,
 	ResultFormatOverrides,
 	ResultFormatter,
@@ -20,8 +25,12 @@ import type {
 
 export interface ResultFormatterConfig {
 	profile: NumberFormatProfile;
-	/** Wired in PR 1 so PR 2 can add policy without changing call sites. */
+	/** Active currency definitions created by Numerals. */
 	currencies?: CurrencyRegistry;
+	/** Whether pure currency values follow the number format or ISO minor units. */
+	currencyPrecisionMode?: CurrencyPrecisionMode;
+	/** Whether pure currency values display their unit code or configured symbol. */
+	currencyDisplayMode?: CurrencyDisplayMode;
 	/** Legacy TeX conversion applies these source preprocessing rules. */
 	preProcessors?: StringReplaceMap[];
 }
@@ -36,17 +45,57 @@ export function createResultFormatter(
 class DefaultResultFormatter implements ResultFormatter {
 	private readonly profile: NumberFormatProfile;
 	private readonly preProcessors: StringReplaceMap[];
+	private readonly currencies: CurrencyRegistry | undefined;
+	private readonly currencyPrecisionMode: CurrencyPrecisionMode;
+	private readonly currencyDisplayMode: CurrencyDisplayMode;
 
 	constructor(config: ResultFormatterConfig) {
 		this.profile = config.profile;
 		this.preProcessors = [...(config.preProcessors ?? [])];
-		// Retain the registry in the public construction contract for PR 2.
-		// PR 1 intentionally applies no currency-special presentation policy.
-		void config.currencies;
+		this.currencies = config.currencies;
+		this.currencyPrecisionMode = config.currencyPrecisionMode ??
+			CurrencyPrecisionMode.FollowNumberFormat;
+		this.currencyDisplayMode = config.currencyDisplayMode ??
+			CurrencyDisplayMode.Code;
 	}
 
 	format(value: unknown, overrides?: ResultFormatOverrides): FormattedResult {
 		const profile = resolveNumberFormatProfile(this.profile, overrides);
+		const currency = this.currencies?.match(value);
+		if (currency) {
+			if (this.usesCurrencyPresentation(overrides)) {
+				return this.formatCurrency(currency, profile, overrides);
+			}
+
+			const legacy = this.formatGeneral(value, profile, overrides);
+			return {
+				...legacy,
+				// Preserve legacy display while ensuring persisted currency never
+				// depends on the alias used to construct the mathjs Unit.
+				canonical: `${formatCurrencyNumber(
+					currency.amount,
+					profile,
+					undefined
+				)} ${currency.definition.code}`,
+			};
+		}
+
+		return this.formatGeneral(value, profile, overrides);
+	}
+
+	private usesCurrencyPresentation(
+		overrides?: ResultFormatOverrides
+	): boolean {
+		return overrides?.decimalPlaces !== undefined ||
+			this.currencyPrecisionMode === CurrencyPrecisionMode.CurrencyStandard ||
+			this.currencyDisplayMode === CurrencyDisplayMode.Symbol;
+	}
+
+	private formatGeneral(
+		value: unknown,
+		profile: NumberFormatProfile,
+		overrides?: ResultFormatOverrides
+	): FormattedResult {
 		const text = formatWithNumberFormatProfile(
 			value,
 			profile,
@@ -66,10 +115,151 @@ class DefaultResultFormatter implements ResultFormatter {
 		return {
 			text,
 			tex,
-			// PR 1 preserves the result-insertion contract byte-for-byte.
+			// Compatibility path: preserve the PR 1 insertion contract.
 			canonical: text,
 		};
 	}
+
+	private formatCurrency(
+		currency: CurrencyMatch,
+		profile: NumberFormatProfile,
+		overrides?: ResultFormatOverrides
+	): FormattedResult {
+		const decimalPlaces = overrides?.decimalPlaces ??
+			(this.currencyPrecisionMode === CurrencyPrecisionMode.CurrencyStandard
+				? currency.definition.fractionDigits
+				: undefined);
+		const numericText = formatCurrencyNumber(
+			currency.amount,
+			profile,
+			decimalPlaces
+		);
+		const text = this.currencyDisplayMode === CurrencyDisplayMode.Symbol
+			? placeConfiguredCurrencySymbol(
+				currency,
+				profile,
+				decimalPlaces
+			)
+			: `${numericText} ${currency.definition.code}`;
+
+		const nonLocalizedProfile = nonLocalizedNumberProfile(profile);
+		const canonicalNumber = formatCurrencyNumber(
+			currency.amount,
+			nonLocalizedProfile,
+			decimalPlaces
+		);
+		const canonical = `${canonicalNumber} ${currency.definition.code}`;
+		const tex = formatCurrencyTeX(
+			currency,
+			nonLocalizedProfile,
+			decimalPlaces,
+			this.currencyDisplayMode
+		);
+
+		return { text, tex, canonical };
+	}
+}
+
+function formatCurrencyNumber(
+	value: number,
+	profile: NumberFormatProfile,
+	decimalPlaces: number | undefined
+): string {
+	return decimalPlaces === undefined
+		? formatWithNumberFormatProfile(value, profile)
+		: formatNumberWithProfile(value, profile, decimalPlaces);
+}
+
+function placeConfiguredCurrencySymbol(
+	currency: CurrencyMatch,
+	profile: NumberFormatProfile,
+	decimalPlaces: number | undefined
+): string {
+	const negative = currency.amount < 0 || Object.is(currency.amount, -0);
+	const numericText = formatCurrencyNumber(
+		Math.abs(currency.amount),
+		profile,
+		decimalPlaces
+	);
+	const locale = profile.locale ?? profile.systemLocale;
+	const templateCurrency = /^[A-Za-z]{3}$/u.test(currency.definition.code)
+		? currency.definition.code.toUpperCase()
+		: 'USD';
+	const parts = new Intl.NumberFormat(locale, {
+		style: 'currency',
+		currency: templateCurrency,
+		currencyDisplay: 'symbol',
+		useGrouping: false,
+		minimumFractionDigits: 0,
+		maximumFractionDigits: 0,
+	}).formatToParts(negative ? -1 : 1);
+
+	let insertedNumber = false;
+	return parts.map((part) => {
+		if (part.type === 'currency') {
+			return currency.definition.symbol;
+		}
+		if (isNumericFormatPart(part.type)) {
+			if (insertedNumber) {
+				return '';
+			}
+			insertedNumber = true;
+			return numericText;
+		}
+		return part.value;
+	}).join('');
+}
+
+function isNumericFormatPart(type: Intl.NumberFormatPartTypes): boolean {
+	return type === 'integer' ||
+		type === 'group' ||
+		type === 'decimal' ||
+		type === 'fraction' ||
+		type === 'nan' ||
+		type === 'infinity' ||
+		type === 'compact' ||
+		type === 'exponentInteger' ||
+		type === 'exponentMinusSign' ||
+		type === 'exponentSeparator';
+}
+
+function nonLocalizedNumberProfile(
+	profile: NumberFormatProfile
+): NumberFormatProfile {
+	if (profile.notation !== 'standard') {
+		return profile;
+	}
+
+	return {
+		...profile,
+		locale: 'en-US',
+		useGrouping: false,
+		mathjsFormat: getLocaleFormatter('en-US', { useGrouping: false }),
+	};
+}
+
+function formatCurrencyTeX(
+	currency: CurrencyMatch,
+	profile: NumberFormatProfile,
+	decimalPlaces: number | undefined,
+	displayMode: CurrencyDisplayMode
+): string {
+	if (displayMode === CurrencyDisplayMode.Symbol) {
+		const negative = currency.amount < 0 || Object.is(currency.amount, -0);
+		const numberTex = numberToTeX(
+			Math.abs(currency.amount),
+			profile,
+			decimalPlaces
+		);
+		return `${negative ? '-' : ''}${currency.definition.texCommand} ${numberTex}`;
+	}
+
+	const numberTex = numberToTeX(currency.amount, profile, decimalPlaces);
+	return `${numberTex}~\\mathrm{${escapeTexRoman(currency.definition.code)}}`;
+}
+
+function escapeTexRoman(value: string): string {
+	return value.replace(/([{}#$%&_])/gu, '\\$1');
 }
 
 function legacyResultToTeX(

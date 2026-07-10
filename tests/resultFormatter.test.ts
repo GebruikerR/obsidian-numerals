@@ -5,11 +5,17 @@ jest.mock('obsidian', () => ({
 }));
 
 import * as math from 'mathjs';
-import { NumeralsNumberFormat } from '../src/numerals.types';
+import {
+	CurrencyDisplayMode,
+	CurrencyPrecisionMode,
+	NumeralsNumberFormat,
+} from '../src/numerals.types';
 import {
 	createNumberFormatProfile,
 	createResultFormatter,
+	CurrencyRegistry,
 } from '../src/formatting';
+import type { CurrencyType } from '../src/numerals.types';
 import { resultToTeX } from '../src/rendering/texRendering';
 
 describe('ResultFormatter', () => {
@@ -163,5 +169,231 @@ describe('ResultFormatter', () => {
 		expect(formatted.tex).toContain('2.00');
 		expect(formatted.tex).toContain('3.00');
 		expect(formatted.tex).toContain('4.00');
+	});
+});
+
+const activeCurrencies: CurrencyType[] = [
+	{ symbol: '$', unicode: 'x024', name: 'dollar', currency: 'USD' },
+	{ symbol: '£', unicode: 'x00A3', name: 'pound', currency: 'GBP' },
+	{ symbol: '¥', unicode: 'x00A5', name: 'yen', currency: 'JPY' },
+	{ symbol: 'د.ك', unicode: 'x0000', name: 'dinar', currency: 'KWD' },
+	{ symbol: '¤', unicode: 'x00A4', name: 'custom', currency: 'XCU' },
+];
+
+function ensureCurrencyUnit(code: string): void {
+	try {
+		math.createUnit(code, { aliases: [code.toLowerCase()] });
+	} catch {
+		// mathjs units are global and another suite may already have created it.
+	}
+}
+
+describe('ResultFormatter currency presentation', () => {
+	beforeAll(() => {
+		for (const { currency } of activeCurrencies) {
+			ensureCurrencyUnit(currency);
+		}
+		ensureCurrencyUnit('CAD');
+	});
+
+	function registry(
+		currencyMap: CurrencyType[] = activeCurrencies,
+		fractionDigitsByCode: ReadonlyMap<string, number> = new Map([
+			['XCU', 4],
+		])
+	): CurrencyRegistry {
+		return CurrencyRegistry.create(currencyMap, {
+			locale: 'en-US',
+			fractionDigitsByCode,
+		});
+	}
+
+	it('preserves legacy output under the compatibility policies', () => {
+		const profile = createNumberFormatProfile(
+			NumeralsNumberFormat.System,
+			'en-US'
+		);
+		const formatter = createResultFormatter({
+			profile,
+			currencies: registry(),
+		});
+		const value = math.unit(1234.5, 'GBP');
+
+		const formatted = formatter.format(value);
+
+		expect(formatted.text).toBe(math.format(value, profile.mathjsFormat));
+		expect(formatted.tex).toBe(resultToTeX(value, []));
+		expect(formatted.canonical).toBe(formatted.text);
+	});
+
+	it('normalizes a pure currency alias to its code in canonical output', () => {
+		const profile = createNumberFormatProfile(
+			NumeralsNumberFormat.System,
+			'en-US'
+		);
+		const formatter = createResultFormatter({
+			profile,
+			currencies: registry(),
+		});
+		const formatted = formatter.format(math.unit(12, 'gbp'));
+
+		expect(formatted.text).toBe('12 gbp');
+		expect(formatted.canonical).toBe('12 GBP');
+	});
+
+	it('uses standard currency digits with code-suffix text and canonical output', () => {
+		const formatter = createResultFormatter({
+			profile: createNumberFormatProfile(NumeralsNumberFormat.System, 'en-US'),
+			currencies: registry(),
+			currencyPrecisionMode: CurrencyPrecisionMode.CurrencyStandard,
+			currencyDisplayMode: CurrencyDisplayMode.Code,
+		});
+
+		const formatted = formatter.format(math.unit(1234.5, 'GBP'));
+
+		expect(formatted.text).toBe('1,234.50 GBP');
+		expect(formatted.tex).toBe('1234.50~\\mathrm{GBP}');
+		expect(formatted.canonical).toBe('1234.50 GBP');
+	});
+
+	it.each([
+		['USD', 1234.5, '1,234.50 USD'],
+		['JPY', 1234.5, '1,235 JPY'],
+		['KWD', 1.2345, '1.235 KWD'],
+		['XCU', 1.23454, '1.2345 XCU'],
+	])('uses registered standard/custom digits for %s', (code, value, expected) => {
+		const formatter = createResultFormatter({
+			profile: createNumberFormatProfile(NumeralsNumberFormat.System, 'en-US'),
+			currencies: registry(),
+			currencyPrecisionMode: CurrencyPrecisionMode.CurrencyStandard,
+		});
+
+		expect(formatter.format(math.unit(value, code)).text).toBe(expected);
+	});
+
+	it('gives @decimalPlaces precedence over currency-standard digits', () => {
+		const formatter = createResultFormatter({
+			profile: createNumberFormatProfile(NumeralsNumberFormat.System, 'en-US'),
+			currencies: registry(),
+			currencyPrecisionMode: CurrencyPrecisionMode.CurrencyStandard,
+		});
+
+		const formatted = formatter.format(math.unit(1.2345, 'GBP'), {
+			decimalPlaces: 3,
+		});
+
+		expect(formatted.text).toBe('1.235 GBP');
+		expect(formatted.tex).toBe('1.235~\\mathrm{GBP}');
+		expect(formatted.canonical).toBe('1.235 GBP');
+	});
+
+	it('places the configured symbol by locale and keeps canonical code output', () => {
+		const formatter = createResultFormatter({
+			profile: createNumberFormatProfile(NumeralsNumberFormat.System, 'en-US'),
+			currencies: registry(),
+			currencyPrecisionMode: CurrencyPrecisionMode.CurrencyStandard,
+			currencyDisplayMode: CurrencyDisplayMode.Symbol,
+		});
+
+		const formatted = formatter.format(math.unit(1234.5, 'GBP'));
+
+		expect(formatted.text).toBe('£1,234.50');
+		expect(formatted.tex).toBe('\\pound 1234.50');
+		expect(formatted.canonical).toBe('1234.50 GBP');
+	});
+
+	it('uses locale suffix placement and locale digits without replacing the configured symbol', () => {
+		const frenchFormatter = createResultFormatter({
+			profile: createNumberFormatProfile(
+				NumeralsNumberFormat.Format_SpaceThousands_CommaDecimal,
+				'en-US'
+			),
+			currencies: registry(),
+			currencyPrecisionMode: CurrencyPrecisionMode.CurrencyStandard,
+			currencyDisplayMode: CurrencyDisplayMode.Symbol,
+		});
+		const arabicProfile = createNumberFormatProfile(
+			NumeralsNumberFormat.System,
+			'ar-EG'
+		);
+		const arabicFormatter = createResultFormatter({
+			profile: arabicProfile,
+			currencies: registry(),
+			currencyPrecisionMode: CurrencyPrecisionMode.CurrencyStandard,
+			currencyDisplayMode: CurrencyDisplayMode.Symbol,
+		});
+
+		expect(frenchFormatter.format(math.unit(1234.5, 'GBP')).text).toBe(
+			'1\u202f234,50\u00a0£'
+		);
+
+		const arabic = arabicFormatter.format(math.unit(-1234.5, 'GBP')).text;
+		const expectedArabic = new Intl.NumberFormat('ar-EG', {
+			style: 'currency',
+			currency: 'GBP',
+			currencyDisplay: 'symbol',
+			minimumFractionDigits: 2,
+			maximumFractionDigits: 2,
+		}).formatToParts(-1234.5).map((part) =>
+			part.type === 'currency' ? '£' : part.value
+		).join('');
+		expect(arabic).toBe(expectedArabic);
+	});
+
+	it('rounds negative midpoints consistently across symbol, TeX, and canonical output', () => {
+		const formatter = createResultFormatter({
+			profile: createNumberFormatProfile(NumeralsNumberFormat.System, 'en-US'),
+			currencies: registry(),
+			currencyPrecisionMode: CurrencyPrecisionMode.CurrencyStandard,
+			currencyDisplayMode: CurrencyDisplayMode.Symbol,
+		});
+
+		const formatted = formatter.format(math.unit(-1.255, 'GBP'));
+
+		expect(formatted.text).toBe('-£1.26');
+		expect(formatted.tex).toBe('-\\pound 1.26');
+		expect(formatted.canonical).toBe('-1.26 GBP');
+	});
+
+	it('uses the configured remapped symbol instead of the Intl-selected symbol', () => {
+		const remappedMap: CurrencyType[] = [{
+			symbol: '$',
+			unicode: 'x024',
+			name: 'dollar',
+			currency: 'CAD',
+		}];
+		const formatter = createResultFormatter({
+			profile: createNumberFormatProfile(NumeralsNumberFormat.System, 'en-US'),
+			currencies: registry(remappedMap),
+			currencyPrecisionMode: CurrencyPrecisionMode.CurrencyStandard,
+			currencyDisplayMode: CurrencyDisplayMode.Symbol,
+		});
+
+		const formatted = formatter.format(math.unit(12.5, 'CAD'));
+
+		expect(formatted.text).toBe('$12.50');
+		expect(formatted.text).not.toContain('CA$');
+		expect(formatted.canonical).toBe('12.50 CAD');
+	});
+
+	it('formats scalar-derived currency but leaves compound currency Units general', () => {
+		const profile = createNumberFormatProfile(NumeralsNumberFormat.System, 'en-US');
+		const formatter = createResultFormatter({
+			profile,
+			currencies: registry(),
+			currencyPrecisionMode: CurrencyPrecisionMode.CurrencyStandard,
+			currencyDisplayMode: CurrencyDisplayMode.Symbol,
+		});
+		const derived = math.divide(math.unit(10, 'GBP'), 8) as math.Unit;
+		const compound = math.divide(
+			math.unit(1.234, 'GBP'),
+			math.unit(1, 'hour')
+		) as math.Unit;
+
+		expect(formatter.format(derived).text).toBe('£1.25');
+		expect(formatter.format(compound).text).toBe(
+			math.format(compound, profile.mathjsFormat)
+		);
+		expect(formatter.format(compound).text).toContain('GBP / hour');
 	});
 });

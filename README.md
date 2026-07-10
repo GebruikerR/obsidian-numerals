@@ -269,6 +269,24 @@ third = 1 / 3
 
 These directives change displayed and inserted results, not values in calculation scope. For computational rounding, use mathjs directly: `round(value, 2)` for numbers or `round(amount, 2, GBP)` for currency Units.
 
+### Currency Formatting
+
+Currency formatting is opt-in so existing notes keep their current output. The compatibility defaults are **Use rendered number format** and **Currency code**, which preserve results such as `120 GBP`.
+
+To use conventional currency precision, choose **Use currency standard** in Numerals settings. Pure currency results then use the standard number of decimal places for their currency:
+
+- GBP and USD use 2 places: `120.00 GBP`
+- JPY uses 0 places: `120 JPY`
+- KWD uses 3 places: `120.000 KWD`
+
+A custom currency mapping uses the configured **Custom currency decimal places** value, from 0 through 20. This setting is enabled when currency-standard precision is selected.
+
+Choose **Configured symbol** to display the symbol from Numerals' active currency mapping instead of its code. Symbol order, spacing, digits, and signs follow the selected locale, while the configured symbol itself is preserved. For example, a `$` mapping to CAD still uses `$`, rather than substituting `CA$`.
+
+Currency presentation applies to pure currency results, including derived values such as `remaining / 8`. Compound rates such as `GBP / hour` retain the general number format and code. A block-level `@decimalPlaces` directive takes precedence over currency-standard digits.
+
+Result insertion always writes the currency code, never a display symbol. For example, a result displayed as `£12.50` is inserted as `12.50 GBP`.
+
 ## Installation
 
 Install **Numerals** from Obsidian's Community Plugins browser.

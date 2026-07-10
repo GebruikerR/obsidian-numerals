@@ -7,9 +7,11 @@ All notable changes to this project will be documented in this file. The format 
 ### Added
 - Per-expression TeX rendering for Inline Numerals via the new `#$:` (result only) and `#=$:` (equation) trigger prefixes, which render with MathJax in both Live Preview and Reading mode. Both prefixes are configurable in settings. (Closes #161)
 - Block-level `@format` and `@decimalPlaces` directives for overriding result presentation without changing calculated values. (Closes #75, #140)
+- Opt-in currency-standard decimal places and configured-symbol display for pure currency results, including derived currency values. Compatibility defaults preserve existing number formatting and currency codes. (Closes #160)
 
 ### Changed
 - Centralized block, inline, TeX, and result-insertion formatting behind one result-formatting pipeline so evaluation always retains raw mathjs values.
+- Result insertion continues to persist currency codes even when configured-symbol display is enabled.
 
 ## [1.10.2] - 2026-05-19
 
