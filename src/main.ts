@@ -1,5 +1,11 @@
 import { NumeralsSuggestor } from "./NumeralsSuggestor";
-import { defaultCurrencyMap, getLocaleFormatter } from "./rendering/displayUtils";
+import { defaultCurrencyMap } from "./rendering/displayUtils";
+import {
+	createNumberFormatProfile,
+	createResultFormatter,
+	CurrencyRegistry,
+	ResultFormatter,
+} from "./formatting";
 import { processAndRenderNumeralsBlockFromSource } from "./rendering/orchestrator";
 import { handleNumeralsBlockClick } from "./rendering/editorNavigation";
 import { getMetadataForFileAtPath, addGlobalsFromScopeToPageCache } from "./processing/scope";
@@ -8,9 +14,7 @@ import {
 	CurrencyType,
 	NumeralsLayout,
 	NumeralsRenderStyle,
-	NumeralsNumberFormat,
 	NumeralsSettings,
-	mathjsFormat,
 	DEFAULT_SETTINGS,
 	NumeralsScope,
 	StringReplaceMap,
@@ -52,38 +56,14 @@ function (c: string) {
    @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call,
    @typescript-eslint/no-unsafe-return */
 
-
-/**
- * Map Numerals Number Format to mathjs format options
- */
-function getMathjsFormat(format: NumeralsNumberFormat): mathjsFormat {
-	switch (format) {
-		case NumeralsNumberFormat.System:
-			return getLocaleFormatter();
-		case NumeralsNumberFormat.Fixed:
-			return {notation: "fixed"};
-		case NumeralsNumberFormat.Exponential:
-			return {notation: "exponential"};
-		case NumeralsNumberFormat.Engineering:
-			return {notation: "engineering"};
-		case NumeralsNumberFormat.Format_CommaThousands_PeriodDecimal:
-			return getLocaleFormatter('en-US');
-		case NumeralsNumberFormat.Format_PeriodThousands_CommaDecimal:
-			return getLocaleFormatter('de-DE');
-		case NumeralsNumberFormat.Format_SpaceThousands_CommaDecimal:
-			return getLocaleFormatter('fr-FR');
-		case NumeralsNumberFormat.Format_Indian:
-			return getLocaleFormatter('en-IN');
-		default:
-			return {notation: "fixed"};
-	}
-}
-
 export default class NumeralsPlugin extends Plugin {
 	settings!: NumeralsSettings;
 	private currencyMap: CurrencyType[] = defaultCurrencyMap;
-	private preProcessors!: StringReplaceMap[];
-	private numberFormat: mathjsFormat;
+	private preProcessors: StringReplaceMap[] = [];
+	private currencyRegistry = CurrencyRegistry.create([]);
+	private resultFormatter: ResultFormatter = createResultFormatter({
+		profile: createNumberFormatProfile(DEFAULT_SETTINGS.numberFormat),
+	});
 	public scopeCache: Map<string, NumeralsScope> = new Map<string, NumeralsScope>();
 
 	/**
@@ -121,7 +101,7 @@ export default class NumeralsPlugin extends Plugin {
 			metadata,
 			type,
 			this.settings,
-			this.numberFormat,
+			this.resultFormatter,
 			this.preProcessors,
 			this.app
 		);
@@ -158,7 +138,7 @@ export default class NumeralsPlugin extends Plugin {
 				metadata,
 				type,
 				this.settings,
-				this.numberFormat,
+				this.resultFormatter,
 				this.preProcessors,
 				this.app
 			);
@@ -194,16 +174,17 @@ export default class NumeralsPlugin extends Plugin {
 			customCurrency: CurrencyType | null
 		): CurrencyType[] {
 		let currencyMap: CurrencyType[] = defaultCurrencyMap.map(m => {
+			const currency = { ...m };
 			if (m.symbol === "$") {
 				if (Object.keys(currencyCodesForDollarSign).includes(dollarCurrency)) {
-					m.currency = dollarCurrency;
+					currency.currency = dollarCurrency;
 				}
 			} else if (m.symbol === "¥") {
 				if (Object.keys(currencyCodesForYenSign).includes(yenCurrency)) {
-					m.currency = yenCurrency;
+					currency.currency = yenCurrency;
 				}
 			}
-			return m;
+			return currency;
 		});
 		if (customCurrency && customCurrency.symbol != "" && customCurrency.currency != "") {
 			const customCurrencyType: CurrencyType = {
@@ -227,6 +208,7 @@ export default class NumeralsPlugin extends Plugin {
 			this.settings.customCurrencySymbol
 		);
 		this.updatePreProcessors();
+		this.updateFormatting();
 	}
 
 	private updatePreProcessors() {
@@ -263,6 +245,7 @@ export default class NumeralsPlugin extends Plugin {
 				}
 			}
 		}
+		this.updateFormatting();
 
 		// Register Markdown Code Block Processors
 		const priority = 100;
@@ -278,7 +261,7 @@ export default class NumeralsPlugin extends Plugin {
 			createInlineNumeralsPostProcessor(
 				this.app,
 				() => this.settings,
-				() => this.numberFormat,
+				() => this.resultFormatter,
 				() => this.preProcessors,
 				this.scopeCache
 			)
@@ -288,7 +271,7 @@ export default class NumeralsPlugin extends Plugin {
 		this.registerEditorExtension(
 			createInlineLivePreviewExtension(
 				() => this.settings,
-				() => this.numberFormat,
+				() => this.resultFormatter,
 				() => this.preProcessors,
 				this.scopeCache,
 				this.app
@@ -354,6 +337,15 @@ export default class NumeralsPlugin extends Plugin {
 	}
 
 	updateLocale(): void {
-		this.numberFormat = getMathjsFormat(this.settings.numberFormat);
+		this.updateFormatting();
+	}
+
+	private updateFormatting(): void {
+		this.currencyRegistry = CurrencyRegistry.create(this.currencyMap);
+		this.resultFormatter = createResultFormatter({
+			profile: createNumberFormatProfile(this.settings.numberFormat),
+			currencies: this.currencyRegistry,
+			preProcessors: this.preProcessors,
+		});
 	}
 }

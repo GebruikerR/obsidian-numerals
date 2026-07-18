@@ -39,18 +39,17 @@ import { editorInfoField, editorLivePreviewField } from 'obsidian';
 import {
 	NumeralsSettings,
 	NumeralsScope,
-	mathjsFormat,
 	StringReplaceMap,
 	InlineNumeralsMode,
 	NumeralsRenderStyle,
 	InlineTriggerSettings,
 } from '../numerals.types';
+import type { FormattedResult, ResultFormatter } from '../formatting';
 import { getMetadataForFileAtPath, getScopeFromFrontmatter } from '../processing/scope';
 import { getActiveInlineTriggers, getInlineTriggers, parseInlineExpression } from './inlineParser';
 import { evaluateInlineExpression } from './inlineEvaluator';
 import { getDataviewApi } from '../dataview';
 import {
-	preProcessorsEqual,
 	renderInlineInputContent,
 	renderInlineValueContent,
 } from './inlineRenderer';
@@ -137,16 +136,14 @@ export function selectionOverlapsRange(
  */
 export class InlineNumeralsWidget extends WidgetType {
 	constructor(
-		private readonly resultText: string,
+		private readonly formattedResult: FormattedResult,
 		private readonly mode: InlineNumeralsMode,
 		private readonly rawExpression: string,
 		private readonly separator: string,
 		private readonly isError: boolean,
 		private readonly formattingClasses: string[] = [],
 		private readonly renderStyle: NumeralsRenderStyle = NumeralsRenderStyle.Plain,
-		private readonly rawResult: unknown = resultText,
 		private readonly processedExpression: string = rawExpression,
-		private readonly preProcessors: StringReplaceMap[] = [],
 	) {
 		super();
 	}
@@ -157,17 +154,17 @@ export class InlineNumeralsWidget extends WidgetType {
 	 */
 	eq(other: InlineNumeralsWidget): boolean {
 		return (
-			this.resultText === other.resultText &&
+			this.formattedResult.text === other.formattedResult.text &&
+			this.formattedResult.tex === other.formattedResult.tex &&
+			this.formattedResult.canonical === other.formattedResult.canonical &&
 			this.mode === other.mode &&
 			this.rawExpression === other.rawExpression &&
 			this.separator === other.separator &&
 			this.isError === other.isError &&
 			this.renderStyle === other.renderStyle &&
-			// rawResult is intentionally not compared: mathjs results can be
-			// fresh objects on every evaluation pass, and any visible change
-			// is already captured by resultText and processedExpression.
+			// Raw mathjs objects never enter the widget. Visible equality is
+			// captured by the formatted result and processed expression.
 			this.processedExpression === other.processedExpression &&
-			preProcessorsEqual(this.preProcessors, other.preProcessors) &&
 			this.formattingClasses.length === other.formattingClasses.length &&
 			this.formattingClasses.every((c, i) => c === other.formattingClasses[i])
 		);
@@ -214,10 +211,8 @@ export class InlineNumeralsWidget extends WidgetType {
 			valueEl.className = 'numerals-inline-value';
 			renderInlineValueContent(
 				valueEl,
-				this.resultText,
-				this.rawResult,
-				this.renderStyle,
-				this.preProcessors
+				this.formattedResult,
+				this.renderStyle
 			);
 
 			span.appendChild(inputEl);
@@ -231,10 +226,8 @@ export class InlineNumeralsWidget extends WidgetType {
 			valueEl.className = 'numerals-inline-value';
 			renderInlineValueContent(
 				valueEl,
-				this.resultText,
-				this.rawResult,
-				this.renderStyle,
-				this.preProcessors
+				this.formattedResult,
+				this.renderStyle
 			);
 
 			span.appendChild(valueEl);
@@ -260,7 +253,7 @@ interface PrevResultRef {
 interface DecorationContext {
 	settings: NumeralsSettings;
 	triggers: InlineTriggerSettings;
-	numberFormat: mathjsFormat | undefined;
+	formatter: ResultFormatter;
 	preProcessors: StringReplaceMap[];
 	getScope: () => NumeralsScope;
 	scopeCache: Map<string, NumeralsScope>;
@@ -275,7 +268,7 @@ interface DecorationContext {
  */
 function createDecorationContext(
 	getSettings: () => NumeralsSettings,
-	getNumberFormat: () => mathjsFormat | undefined,
+	getFormatter: () => ResultFormatter,
 	preProcessors: StringReplaceMap[],
 	scopeCache: Map<string, NumeralsScope>,
 	app: App,
@@ -313,7 +306,7 @@ function createDecorationContext(
 	return {
 		settings,
 		triggers,
-		numberFormat: getNumberFormat(),
+		formatter: getFormatter(),
 		preProcessors,
 		getScope,
 		scopeCache,
@@ -360,8 +353,7 @@ function tryBuildNodeDecoration(
 	}
 
 	// Evaluate
-	let resultText: string;
-	let rawResult: unknown = '';
+	let formattedResult: FormattedResult = { text: '', tex: '', canonical: '' };
 	let processedExpression = parsed.expression;
 	let isError = false;
 	try {
@@ -369,15 +361,13 @@ function tryBuildNodeDecoration(
 		const result = evaluateInlineExpression(
 			parsed.expression,
 			scope,
-			ctx.numberFormat,
 			ctx.preProcessors,
 			prevResultRef.value,
 			ctx.app,
 			ctx.filePath,
 			ctx.settings,
 		);
-		resultText = result.formatted;
-		rawResult = result.raw;
+		formattedResult = ctx.formatter.format(result.raw);
 		processedExpression = result.processedExpression;
 		prevResultRef.value = result.raw;
 		for (const path of result.referencedPaths) {
@@ -403,8 +393,7 @@ function tryBuildNodeDecoration(
 			}
 		}
 	} catch {
-		resultText = '';
-		rawResult = '';
+		formattedResult = { text: '', tex: '', canonical: '' };
 		processedExpression = parsed.expression;
 		isError = true;
 		prevResultRef.value = undefined;
@@ -413,16 +402,14 @@ function tryBuildNodeDecoration(
 	const formattingClasses = getFormattingClasses(tokenProps);
 
 	const widget = new InlineNumeralsWidget(
-		resultText,
+		formattedResult,
 		parsed.mode,
 		parsed.expression,
 		ctx.settings.inlineEquationSeparator,
 		isError,
 		formattingClasses,
 		parsed.renderStyle,
-		rawResult,
 		processedExpression,
-		ctx.preProcessors,
 	);
 
 	return Decoration.replace({ widget }).range(spanFrom, spanTo);
@@ -557,7 +544,7 @@ function updateDecorations(
  * as evaluated widgets in Obsidian's Live Preview mode.
  *
  * @param getSettings     - Returns current plugin settings (called on each update for hot-reload)
- * @param getNumberFormat - Returns the active mathjs number format
+ * @param getFormatter      - Returns the active shared result formatter
  * @param getPreProcessors - Returns current string replacement preprocessors (currency symbols, etc.)
  * @param scopeCache        - Shared cache of per-file variable scopes
  * @param app               - The Obsidian App instance
@@ -565,7 +552,7 @@ function updateDecorations(
  */
 export function createInlineLivePreviewExtension(
 	getSettings: () => NumeralsSettings,
-	getNumberFormat: () => mathjsFormat | undefined,
+	getFormatter: () => ResultFormatter,
 	getPreProcessors: () => StringReplaceMap[],
 	scopeCache: Map<string, NumeralsScope>,
 	app: App,
@@ -680,7 +667,7 @@ export function createInlineLivePreviewExtension(
 
 				return createDecorationContext(
 					getSettings,
-					getNumberFormat,
+					getFormatter,
 					getPreProcessors(),
 					scopeCache,
 					app,

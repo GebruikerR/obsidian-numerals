@@ -10,11 +10,19 @@ import {
 	RenderContext,
 	StringReplaceMap,
 	NumeralsRenderStyle,
+	NumeralsNumberFormat,
 	NumeralsSettings,
 	DEFAULT_SETTINGS,
-	mathjsFormat,
 	numeralsBlockInfo,
 } from '../src/numerals.types';
+import {
+	createNumberFormatProfile,
+	createResultFormatter,
+} from '../src/formatting';
+
+const formatter = createResultFormatter({
+	profile: createNumberFormatProfile(NumeralsNumberFormat.System, 'en-US'),
+});
 
 describe('Rendering Pipeline Types', () => {
 	describe('ProcessedBlock', () => {
@@ -22,12 +30,15 @@ describe('Rendering Pipeline Types', () => {
 			const processedBlock: ProcessedBlock = {
 				rawRows: ['line1', 'line2'],
 				processedSource: 'processed\nsource',
+				transparentLineIndexes: [],
 				blockInfo: {
 					emitter_lines: [1],
 					insertion_lines: [],
 					hidden_lines: [],
 					shouldHideNonEmitterLines: false,
 				},
+				formatOverrides: {},
+				invalidFormatDirectives: [],
 			};
 
 			expect(processedBlock.rawRows).toHaveLength(2);
@@ -39,12 +50,15 @@ describe('Rendering Pipeline Types', () => {
 			const processedBlock: ProcessedBlock = {
 				rawRows: [],
 				processedSource: '',
+				transparentLineIndexes: [],
 				blockInfo: {
 					emitter_lines: [],
 					insertion_lines: [],
 					hidden_lines: [],
 					shouldHideNonEmitterLines: false,
 				},
+				formatOverrides: {},
+				invalidFormatDirectives: [],
 			};
 
 			expect(processedBlock.rawRows).toHaveLength(0);
@@ -178,7 +192,8 @@ describe('Rendering Pipeline Types', () => {
 			const context: RenderContext = {
 				renderStyle: NumeralsRenderStyle.Plain,
 				settings: DEFAULT_SETTINGS,
-				numberFormat: undefined,
+				formatter,
+				formatOverrides: {},
 				preProcessors: [],
 			};
 
@@ -190,12 +205,13 @@ describe('Rendering Pipeline Types', () => {
 			const context: RenderContext = {
 				renderStyle: NumeralsRenderStyle.TeX,
 				settings: DEFAULT_SETTINGS,
-				numberFormat: { notation: 'fixed' },
+				formatter,
+				formatOverrides: { numberFormat: NumeralsNumberFormat.Fixed },
 				preProcessors: [],
 			};
 
 			expect(context.renderStyle).toBe(NumeralsRenderStyle.TeX);
-			expect(context.numberFormat).toHaveProperty('notation', 'fixed');
+			expect(context.formatOverrides.numberFormat).toBe(NumeralsNumberFormat.Fixed);
 		});
 
 		it('should accept valid RenderContext with preProcessors', () => {
@@ -207,7 +223,8 @@ describe('Rendering Pipeline Types', () => {
 			const context: RenderContext = {
 				renderStyle: NumeralsRenderStyle.SyntaxHighlight,
 				settings: DEFAULT_SETTINGS,
-				numberFormat: undefined,
+				formatter,
+				formatOverrides: {},
 				preProcessors,
 			};
 
@@ -255,7 +272,10 @@ describe('Type Compatibility', () => {
 		const processedBlock: ProcessedBlock = {
 			rawRows,
 			processedSource,
+			transparentLineIndexes: [],
 			blockInfo,
+			formatOverrides: {},
+			invalidFormatDirectives: [],
 		};
 
 		expect(processedBlock).toBeDefined();

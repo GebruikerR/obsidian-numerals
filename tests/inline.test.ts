@@ -19,13 +19,18 @@ import { defaultCurrencyMap } from '../src/rendering/displayUtils';
 import {
 	InlineNumeralsMode,
 	InlineTriggerSettings,
+	NumeralsNumberFormat,
 	NumeralsRenderStyle,
 	NumeralsScope,
 	StringReplaceMap,
-	mathjsFormat,
 } from '../src/numerals.types';
 import { parseInlineExpression } from '../src/inline/inlineParser';
 import { evaluateInlineExpression } from '../src/inline/inlineEvaluator';
+import {
+	createNumberFormatProfile,
+	createResultFormatter,
+	type ResultFormatter,
+} from '../src/formatting';
 
 // ---------------------------------------------------------------------------
 // Currency setup (mirrors numeralsUtilities.test.ts)
@@ -64,6 +69,25 @@ const DEFAULT_TRIGGERS: InlineTriggerSettings = {
 
 function parse(text: string, triggers: Partial<InlineTriggerSettings> = {}) {
 	return parseInlineExpression(text, { ...DEFAULT_TRIGGERS, ...triggers });
+}
+
+function testFormatter(
+	format: NumeralsNumberFormat = NumeralsNumberFormat.System,
+	processors: StringReplaceMap[] = preProcessors,
+): ResultFormatter {
+	return createResultFormatter({
+		profile: createNumberFormatProfile(format, 'en-US'),
+		preProcessors: processors,
+	});
+}
+
+const defaultFormatter = testFormatter();
+
+function formattedText(
+	result: ReturnType<typeof evaluateInlineExpression>,
+	formatter: ResultFormatter = defaultFormatter,
+): string {
+	return formatter.format(result.raw).text;
 }
 
 // ---------------------------------------------------------------------------
@@ -275,7 +299,6 @@ describe('parseInlineExpression', () => {
 // ---------------------------------------------------------------------------
 describe('evaluateInlineExpression', () => {
 	const emptyScope = new NumeralsScope();
-	const defaultFormat: mathjsFormat = undefined;
 	const noPreProcessors: StringReplaceMap[] = [];
 	const crossNoteSettings = {
 		enableCrossNoteReferences: true,
@@ -285,29 +308,29 @@ describe('evaluateInlineExpression', () => {
 	// --- Basic arithmetic ---------------------------------------------------
 	describe('basic arithmetic', () => {
 		it('should evaluate "3 + 2" to "5"', () => {
-			const result = evaluateInlineExpression('3 + 2', emptyScope, defaultFormat, noPreProcessors);
-			expect(result.formatted).toBe('5');
+			const result = evaluateInlineExpression('3 + 2', emptyScope, noPreProcessors);
+			expect(result.raw).toBe(5);
+			expect(formattedText(result)).toBe('5');
 		});
 
 		it('should evaluate "10 / 3" with fixed format containing "3.333"', () => {
-			const fixedFormat: mathjsFormat = { notation: 'fixed', precision: 4 };
-			const result = evaluateInlineExpression('10 / 3', emptyScope, fixedFormat, noPreProcessors);
-			expect(result.formatted).toContain('3.333');
+			const result = evaluateInlineExpression('10 / 3', emptyScope, noPreProcessors);
+			expect(formattedText(result, testFormatter(NumeralsNumberFormat.Fixed))).toContain('3.333');
 		});
 
 		it('should evaluate multiplication', () => {
-			const result = evaluateInlineExpression('7 * 6', emptyScope, defaultFormat, noPreProcessors);
-			expect(result.formatted).toBe('42');
+			const result = evaluateInlineExpression('7 * 6', emptyScope, noPreProcessors);
+			expect(result.raw).toBe(42);
 		});
 
 		it('should evaluate subtraction', () => {
-			const result = evaluateInlineExpression('100 - 37', emptyScope, defaultFormat, noPreProcessors);
-			expect(result.formatted).toBe('63');
+			const result = evaluateInlineExpression('100 - 37', emptyScope, noPreProcessors);
+			expect(result.raw).toBe(63);
 		});
 
 		it('should evaluate exponentiation', () => {
-			const result = evaluateInlineExpression('2^10', emptyScope, defaultFormat, noPreProcessors);
-			expect(result.formatted).toBe('1024');
+			const result = evaluateInlineExpression('2^10', emptyScope, noPreProcessors);
+			expect(result.raw).toBe(1024);
 		});
 	});
 
@@ -329,7 +352,6 @@ describe('evaluateInlineExpression', () => {
 			const result = evaluateInlineExpression(
 				'[[materials]].price * 2',
 				emptyScope,
-				defaultFormat,
 				noPreProcessors,
 				undefined,
 				app as any,
@@ -337,7 +359,8 @@ describe('evaluateInlineExpression', () => {
 				crossNoteSettings,
 			);
 
-			expect(result.formatted).toBe('20');
+			expect(result.raw).toBe(20);
+			expect(formattedText(result)).toBe('20');
 			expect(result.referencedPaths).toEqual(['materials.md']);
 		});
 	});
@@ -345,33 +368,33 @@ describe('evaluateInlineExpression', () => {
 	// --- Units --------------------------------------------------------------
 	describe('units', () => {
 		it('should convert "3 ft to inches" and contain "36"', () => {
-			const result = evaluateInlineExpression('3 ft to inches', emptyScope, defaultFormat, noPreProcessors);
-			expect(result.formatted).toContain('36');
+			const result = evaluateInlineExpression('3 ft to inches', emptyScope, noPreProcessors);
+			expect(formattedText(result)).toContain('36');
 		});
 
 		it('should convert "100 km/hr in mi/hr" to approximately 62.137', () => {
-			const result = evaluateInlineExpression('100 km/hr in mi/hr', emptyScope, defaultFormat, noPreProcessors);
-			expect(result.formatted).toMatch(/62\.137/);
+			const result = evaluateInlineExpression('100 km/hr in mi/hr', emptyScope, noPreProcessors);
+			expect(formattedText(result)).toMatch(/62\.137/);
 		});
 
 		it('should convert "1 kg to lb"', () => {
-			const result = evaluateInlineExpression('1 kg to lb', emptyScope, defaultFormat, noPreProcessors);
-			expect(result.formatted).toContain('2.20');
+			const result = evaluateInlineExpression('1 kg to lb', emptyScope, noPreProcessors);
+			expect(formattedText(result)).toContain('2.20');
 		});
 	});
 
 	// --- Currency ------------------------------------------------------------
 	describe('currency', () => {
 		it('should evaluate "$100 * 2" and produce result with "200" and "USD"', () => {
-			const result = evaluateInlineExpression('$100 * 2', emptyScope, defaultFormat, preProcessors);
-			expect(result.formatted).toContain('200');
-			expect(result.formatted).toContain('USD');
+			const result = evaluateInlineExpression('$100 * 2', emptyScope, preProcessors);
+			expect(formattedText(result)).toContain('200');
+			expect(formattedText(result)).toContain('USD');
 		});
 
 		it('should evaluate "€50 + €25" with EUR currency', () => {
-			const result = evaluateInlineExpression('€50 + €25', emptyScope, defaultFormat, preProcessors);
-			expect(result.formatted).toContain('75');
-			expect(result.formatted).toContain('EUR');
+			const result = evaluateInlineExpression('€50 + €25', emptyScope, preProcessors);
+			expect(formattedText(result)).toContain('75');
+			expect(formattedText(result)).toContain('EUR');
 		});
 	});
 
@@ -380,8 +403,8 @@ describe('evaluateInlineExpression', () => {
 		it('should access variable from scope: x = 5, evaluate "x * 2" to "10"', () => {
 			const scope = new NumeralsScope();
 			scope.set('x', 5);
-			const result = evaluateInlineExpression('x * 2', scope, defaultFormat, noPreProcessors);
-			expect(result.formatted).toBe('10');
+			const result = evaluateInlineExpression('x * 2', scope, noPreProcessors);
+			expect(result.raw).toBe(10);
 		});
 
 		it('should access currency variable from scope', () => {
@@ -390,18 +413,17 @@ describe('evaluateInlineExpression', () => {
 			const result = evaluateInlineExpression(
 				'$36.03 + $2 * 3 + $pizza',
 				scope,
-				defaultFormat,
 				preProcessors
 			);
-			expect(result.formatted).toContain('52.03');
+			expect(formattedText(result)).toContain('52.03');
 		});
 
 		it('should access multiple variables from scope', () => {
 			const scope = new NumeralsScope();
 			scope.set('a', 10);
 			scope.set('b', 20);
-			const result = evaluateInlineExpression('a + b', scope, defaultFormat, noPreProcessors);
-			expect(result.formatted).toBe('30');
+			const result = evaluateInlineExpression('a + b', scope, noPreProcessors);
+			expect(result.raw).toBe(30);
 		});
 
 		it('should use scope values that were set by prior evaluations', () => {
@@ -411,11 +433,10 @@ describe('evaluateInlineExpression', () => {
 			const result = evaluateInlineExpression(
 				'totalCost * taxRate',
 				scope,
-				defaultFormat,
 				preProcessors
 			);
-			expect(result.formatted).toContain('20');
-			expect(result.formatted).toContain('USD');
+			expect(formattedText(result)).toContain('20');
+			expect(formattedText(result)).toContain('USD');
 		});
 	});
 
@@ -423,73 +444,72 @@ describe('evaluateInlineExpression', () => {
 	describe('error cases', () => {
 		it('should throw on invalid expression "definitely not math @@@@"', () => {
 			expect(() => {
-				evaluateInlineExpression('definitely not math @@@@', emptyScope, defaultFormat, noPreProcessors);
+				evaluateInlineExpression('definitely not math @@@@', emptyScope, noPreProcessors);
 			}).toThrow();
 		});
 
-		it('should return "Infinity" for "1/0"', () => {
-			const result = evaluateInlineExpression('1/0', emptyScope, defaultFormat, noPreProcessors);
-			expect(result.formatted).toBe('Infinity');
+		it('should return and format Infinity for "1/0"', () => {
+			const result = evaluateInlineExpression('1/0', emptyScope, noPreProcessors);
+			expect(result.raw).toBe(Infinity);
+			expect(formattedText(result)).toBe('∞');
 		});
 
 		it('should throw when referencing an undefined variable', () => {
 			expect(() => {
-				evaluateInlineExpression('undefinedVar * 2', emptyScope, defaultFormat, noPreProcessors);
+				evaluateInlineExpression('undefinedVar * 2', emptyScope, noPreProcessors);
 			}).toThrow();
 		});
 
 		it('should throw when expression evaluates to undefined (e.g. comment)', () => {
 			expect(() => {
-				evaluateInlineExpression('# just a comment', emptyScope, defaultFormat, noPreProcessors);
+				evaluateInlineExpression('# just a comment', emptyScope, noPreProcessors);
 			}).toThrow('Expression produced no result');
 		});
 	});
 
 	// --- Preprocessing -------------------------------------------------------
 	describe('preprocessing', () => {
-		it('should handle thousands separators: "$1,000 * 2" → contains "2000" and "USD"', () => {
-			const result = evaluateInlineExpression('$1,000 * 2', emptyScope, defaultFormat, preProcessors);
-			expect(result.formatted).toContain('2000');
-			expect(result.formatted).toContain('USD');
+		it('should handle thousands separators and preserve localized grouping', () => {
+			const result = evaluateInlineExpression('$1,000 * 2', emptyScope, preProcessors);
+			expect(formattedText(result)).toContain('2,000');
+			expect(formattedText(result)).toContain('USD');
 		});
 
 		it('should return the processed expression used for mathjs evaluation', () => {
-			const result = evaluateInlineExpression('$1,000 * 2', emptyScope, defaultFormat, preProcessors);
+			const result = evaluateInlineExpression('$1,000 * 2', emptyScope, preProcessors);
 			expect(result.processedExpression).toBe('1000 USD * 2');
 		});
 
 		it('should handle multiple thousands separators: "$1,000,000"', () => {
-			const result = evaluateInlineExpression('$1,000,000 + $0', emptyScope, defaultFormat, preProcessors);
+			const result = evaluateInlineExpression('$1,000,000 + $0', emptyScope, preProcessors);
 			// mathjs uses exponential notation for large numbers by default
-			expect(result.formatted).toMatch(/1e\+6|1000000/);
+			expect(formattedText(result)).toMatch(/1e\+6|1,000,000|1000000/);
 		});
 
 		it('should apply custom preprocessors', () => {
 			const customPreProcessors: StringReplaceMap[] = [
 				{ regex: /apples/g, replaceStr: '3' },
 			];
-			const result = evaluateInlineExpression('apples + 2', emptyScope, defaultFormat, customPreProcessors);
-			expect(result.formatted).toBe('5');
+			const result = evaluateInlineExpression('apples + 2', emptyScope, customPreProcessors);
+			expect(result.raw).toBe(5);
 		});
 	});
 
 	// --- Number format -------------------------------------------------------
 	describe('number formatting', () => {
 		it('should respect exponential notation format', () => {
-			const expFormat: mathjsFormat = { notation: 'exponential', precision: 3 };
-			const result = evaluateInlineExpression('1234567', emptyScope, expFormat, noPreProcessors);
-			expect(result.formatted).toMatch(/1\.23.*e\+6/);
+			const result = evaluateInlineExpression('1234567', emptyScope, noPreProcessors);
+			expect(formattedText(result, testFormatter(NumeralsNumberFormat.Exponential))).toMatch(/1\.234567e\+6/);
 		});
 
 		it('should respect engineering notation format', () => {
-			const engFormat: mathjsFormat = { notation: 'engineering', precision: 3 };
-			const result = evaluateInlineExpression('1234567', emptyScope, engFormat, noPreProcessors);
-			expect(result.formatted).toMatch(/1\.23.*e\+6/);
+			const result = evaluateInlineExpression('1234567', emptyScope, noPreProcessors);
+			expect(formattedText(result, testFormatter(NumeralsNumberFormat.Engineering))).toMatch(/1\.234567e\+6/);
 		});
 
 		it('should use default format when format is undefined', () => {
-			const result = evaluateInlineExpression('2 + 2', emptyScope, undefined, noPreProcessors);
-			expect(result.formatted).toBe('4');
+			const result = evaluateInlineExpression('2 + 2', emptyScope, noPreProcessors);
+			expect(formattedText(result)).toBe('4');
 		});
 	});
 });
@@ -499,34 +519,32 @@ describe('evaluateInlineExpression', () => {
 // ---------------------------------------------------------------------------
 describe('evaluateInlineExpression — @prev directive', () => {
 	const emptyScope = new NumeralsScope();
-	const defaultFormat: mathjsFormat = undefined;
 	const noPreProcessors: StringReplaceMap[] = [];
 
 	describe('basic @prev usage', () => {
 		it('should evaluate @prev when prevResult is provided', () => {
-			const result = evaluateInlineExpression('@prev * 2', emptyScope, defaultFormat, noPreProcessors, 5);
-			expect(result.formatted).toBe('10');
+			const result = evaluateInlineExpression('@prev * 2', emptyScope, noPreProcessors, 5);
 			expect(result.raw).toBe(10);
 		});
 
 		it('should throw when @prev is used with no previous result', () => {
 			expect(() => {
-				evaluateInlineExpression('@prev + 1', emptyScope, defaultFormat, noPreProcessors, undefined);
+				evaluateInlineExpression('@prev + 1', emptyScope, noPreProcessors, undefined);
 			}).toThrow(/previous/i);
 		});
 
 		it('should throw when @prev is used with no prevResult argument', () => {
 			expect(() => {
-				evaluateInlineExpression('@prev + 1', emptyScope, defaultFormat, noPreProcessors);
+				evaluateInlineExpression('@prev + 1', emptyScope, noPreProcessors);
 			}).toThrow(/previous/i);
 		});
 
 		it('should be case-insensitive (@Prev, @PREV)', () => {
-			const r1 = evaluateInlineExpression('@Prev + 1', emptyScope, defaultFormat, noPreProcessors, 10);
-			expect(r1.formatted).toBe('11');
+			const r1 = evaluateInlineExpression('@Prev + 1', emptyScope, noPreProcessors, 10);
+			expect(r1.raw).toBe(11);
 
-			const r2 = evaluateInlineExpression('@PREV + 1', emptyScope, defaultFormat, noPreProcessors, 10);
-			expect(r2.formatted).toBe('11');
+			const r2 = evaluateInlineExpression('@PREV + 1', emptyScope, noPreProcessors, 10);
+			expect(r2.raw).toBe(11);
 		});
 	});
 
@@ -534,34 +552,34 @@ describe('evaluateInlineExpression — @prev directive', () => {
 		it('should work when prevResult has units', () => {
 			const prevValue = math.evaluate('10 kg');
 			// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-			const result = evaluateInlineExpression('@prev * 2', emptyScope, defaultFormat, noPreProcessors, prevValue);
-			expect(result.formatted).toContain('20');
-			expect(result.formatted).toContain('kg');
+			const result = evaluateInlineExpression('@prev * 2', emptyScope, noPreProcessors, prevValue);
+			expect(formattedText(result)).toContain('20');
+			expect(formattedText(result)).toContain('kg');
 		});
 
 		it('should work when prevResult is a currency', () => {
 			const prevValue = math.evaluate('100 USD');
 			// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-			const result = evaluateInlineExpression('@prev * 1.08', emptyScope, defaultFormat, preProcessors, prevValue);
-			expect(result.formatted).toContain('108');
-			expect(result.formatted).toContain('USD');
+			const result = evaluateInlineExpression('@prev * 1.08', emptyScope, preProcessors, prevValue);
+			expect(formattedText(result)).toContain('108');
+			expect(formattedText(result)).toContain('USD');
 		});
 	});
 
 	describe('@prev chaining', () => {
 		it('should chain: evaluate first, then use result as prevResult for second', () => {
-			const r1 = evaluateInlineExpression('50 + 50', emptyScope, defaultFormat, noPreProcessors);
-			expect(r1.formatted).toBe('100');
+			const r1 = evaluateInlineExpression('50 + 50', emptyScope, noPreProcessors);
+			expect(r1.raw).toBe(100);
 
-			const r2 = evaluateInlineExpression('@prev / 4', emptyScope, defaultFormat, noPreProcessors, r1.raw);
-			expect(r2.formatted).toBe('25');
+			const r2 = evaluateInlineExpression('@prev / 4', emptyScope, noPreProcessors, r1.raw);
+			expect(r2.raw).toBe(25);
 		});
 
 		it('should chain three expressions', () => {
-			const r1 = evaluateInlineExpression('10', emptyScope, defaultFormat, noPreProcessors);
-			const r2 = evaluateInlineExpression('@prev * 3', emptyScope, defaultFormat, noPreProcessors, r1.raw);
-			const r3 = evaluateInlineExpression('@prev + 5', emptyScope, defaultFormat, noPreProcessors, r2.raw);
-			expect(r3.formatted).toBe('35');
+			const r1 = evaluateInlineExpression('10', emptyScope, noPreProcessors);
+			const r2 = evaluateInlineExpression('@prev * 3', emptyScope, noPreProcessors, r1.raw);
+			const r3 = evaluateInlineExpression('@prev + 5', emptyScope, noPreProcessors, r2.raw);
+			expect(r3.raw).toBe(35);
 		});
 	});
 
@@ -569,27 +587,26 @@ describe('evaluateInlineExpression — @prev directive', () => {
 		it('should work alongside scope variables', () => {
 			const scope = new NumeralsScope();
 			scope.set('tax', 0.08);
-			const result = evaluateInlineExpression('@prev * tax', scope, defaultFormat, noPreProcessors, 100);
-			expect(result.formatted).toBe('8');
+			const result = evaluateInlineExpression('@prev * tax', scope, noPreProcessors, 100);
+			expect(result.raw).toBe(8);
 		});
 
 		it('should work with preprocessors (currency)', () => {
-			const result = evaluateInlineExpression('$50 + @prev', emptyScope, defaultFormat, preProcessors, math.evaluate('50 USD'));
-			expect(result.formatted).toContain('100');
-			expect(result.formatted).toContain('USD');
+			const result = evaluateInlineExpression('$50 + @prev', emptyScope, preProcessors, math.evaluate('50 USD'));
+			expect(formattedText(result)).toContain('100');
+			expect(formattedText(result)).toContain('USD');
 		});
 	});
 
 	describe('backward compatibility', () => {
 		it('should work without prevResult argument (existing behavior)', () => {
-			const result = evaluateInlineExpression('3 + 2', emptyScope, defaultFormat, noPreProcessors);
-			expect(result.formatted).toBe('5');
+			const result = evaluateInlineExpression('3 + 2', emptyScope, noPreProcessors);
 			expect(result.raw).toBe(5);
 		});
 
 		it('expressions without @prev should not be affected by prevResult', () => {
-			const result = evaluateInlineExpression('7 * 6', emptyScope, defaultFormat, noPreProcessors, 999);
-			expect(result.formatted).toBe('42');
+			const result = evaluateInlineExpression('7 * 6', emptyScope, noPreProcessors, 999);
+			expect(result.raw).toBe(42);
 		});
 	});
 });
@@ -599,31 +616,30 @@ describe('evaluateInlineExpression — @prev directive', () => {
 // ---------------------------------------------------------------------------
 describe('evaluateInlineExpression — note-global extraction', () => {
 	const emptyScope = new NumeralsScope();
-	const defaultFormat: mathjsFormat = undefined;
 	const noPreProcessors: StringReplaceMap[] = [];
 
 	describe('$-prefixed assignments are extracted', () => {
 		it('should return $x in globals when expression is "$x = 10"', () => {
-			const result = evaluateInlineExpression('$x = 10', emptyScope, defaultFormat, noPreProcessors);
+			const result = evaluateInlineExpression('$x = 10', emptyScope, noPreProcessors);
 			expect(result.globals.size).toBe(1);
 			expect(result.globals.get('$x')).toBe(10);
 		});
 
 		it('should return $price with units', () => {
-			const result = evaluateInlineExpression('$price = 50 kg', emptyScope, defaultFormat, noPreProcessors);
+			const result = evaluateInlineExpression('$price = 50 kg', emptyScope, noPreProcessors);
 			expect(result.globals.size).toBe(1);
 			expect(result.globals.has('$price')).toBe(true);
 		});
 
 		it('should return $price with currency', () => {
-			const result = evaluateInlineExpression('$price = $100', emptyScope, defaultFormat, preProcessors);
+			const result = evaluateInlineExpression('$price = $100', emptyScope, preProcessors);
 			expect(result.globals.has('$price')).toBe(true);
 		});
 
 		it('should return multiple globals from compound expression', () => {
 			// mathjs supports semicolons for multiple statements, but inline is single-expression.
 			// This test verifies only one global from a single assignment.
-			const result = evaluateInlineExpression('$y = 42', emptyScope, defaultFormat, noPreProcessors);
+			const result = evaluateInlineExpression('$y = 42', emptyScope, noPreProcessors);
 			expect(result.globals.size).toBe(1);
 			expect(result.globals.get('$y')).toBe(42);
 		});
@@ -631,21 +647,21 @@ describe('evaluateInlineExpression — note-global extraction', () => {
 
 	describe('non-$ assignments are NOT extracted', () => {
 		it('should return empty globals for "y = 10"', () => {
-			const result = evaluateInlineExpression('y = 10', emptyScope, defaultFormat, noPreProcessors);
+			const result = evaluateInlineExpression('y = 10', emptyScope, noPreProcessors);
 			expect(result.globals.size).toBe(0);
 		});
 
 		it('should return empty globals for simple arithmetic', () => {
-			const result = evaluateInlineExpression('3 + 2', emptyScope, defaultFormat, noPreProcessors);
+			const result = evaluateInlineExpression('3 + 2', emptyScope, noPreProcessors);
 			expect(result.globals.size).toBe(0);
 		});
 	});
 
 	describe('globals with @prev', () => {
 		it('should extract $total when using @prev', () => {
-			const result = evaluateInlineExpression('$total = @prev * 2', emptyScope, defaultFormat, noPreProcessors, 50);
+			const result = evaluateInlineExpression('$total = @prev * 2', emptyScope, noPreProcessors, 50);
 			expect(result.globals.get('$total')).toBe(100);
-			expect(result.formatted).toBe('100');
+			expect(result.raw).toBe(100);
 		});
 	});
 
@@ -654,15 +670,15 @@ describe('evaluateInlineExpression — note-global extraction', () => {
 			const scope = new NumeralsScope();
 			scope.set('$x', 10);
 			// Expression that reads $x but doesn't reassign it
-			const result = evaluateInlineExpression('$x + 5', scope, defaultFormat, noPreProcessors);
+			const result = evaluateInlineExpression('$x + 5', scope, noPreProcessors);
 			expect(result.globals.size).toBe(0);
-			expect(result.formatted).toBe('15');
+			expect(result.raw).toBe(15);
 		});
 
 		it('should report $x if it was reassigned to a different value', () => {
 			const scope = new NumeralsScope();
 			scope.set('$x', 10);
-			const result = evaluateInlineExpression('$x = 20', scope, defaultFormat, noPreProcessors);
+			const result = evaluateInlineExpression('$x = 20', scope, noPreProcessors);
 			expect(result.globals.size).toBe(1);
 			expect(result.globals.get('$x')).toBe(20);
 		});

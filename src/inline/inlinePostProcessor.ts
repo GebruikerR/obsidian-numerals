@@ -1,5 +1,6 @@
 import { App, MarkdownPostProcessorContext, MarkdownRenderChild } from 'obsidian';
-import { NumeralsSettings, NumeralsScope, mathjsFormat, StringReplaceMap, InlineNumeralsMode, InlineEvaluationResult, NumeralsRenderStyle } from '../numerals.types';
+import { NumeralsSettings, NumeralsScope, StringReplaceMap, InlineNumeralsMode, InlineEvaluationResult, NumeralsRenderStyle } from '../numerals.types';
+import type { FormattedResult, ResultFormatter } from '../formatting';
 import { getMetadataForFileAtPath, getScopeFromFrontmatter } from '../processing/scope';
 import { getActiveInlineTriggers, getInlineTriggers, parseInlineExpression } from './inlineParser';
 import { evaluateInlineExpression } from './inlineEvaluator';
@@ -45,8 +46,8 @@ function renderInlineResult(
 	mode: InlineNumeralsMode,
 	renderStyle: NumeralsRenderStyle,
 	result: InlineEvaluationResult,
+	formattedResult: FormattedResult,
 	settings: NumeralsSettings,
-	preProcessors: StringReplaceMap[]
 ): void {
 	codeEl.empty();
 	codeEl.addClass('numerals-inline');
@@ -69,20 +70,16 @@ function renderInlineResult(
 		const valueEl = codeEl.createEl('span', { cls: 'numerals-inline-value' });
 		renderInlineValueContent(
 			valueEl,
-			result.formatted,
-			result.raw,
-			renderStyle,
-			preProcessors
+			formattedResult,
+			renderStyle
 		);
 	} else {
 		codeEl.addClass('numerals-inline-result');
 		const valueEl = codeEl.createEl('span', { cls: 'numerals-inline-value' });
 		renderInlineValueContent(
 			valueEl,
-			result.formatted,
-			result.raw,
-			renderStyle,
-			preProcessors
+			formattedResult,
+			renderStyle
 		);
 	}
 }
@@ -127,7 +124,7 @@ interface InlineProcessingResult {
  * @param codeEl - The inline <code> element
  * @param scope - The variable scope to evaluate against (also updated with globals)
  * @param settings - Plugin settings
- * @param numberFormat - Number formatting options
+ * @param formatter - Shared result formatter
  * @param preProcessors - String replacement preprocessors
  * @param prevResultRef - Mutable ref tracking the previous inline result (for @prev support)
  * @param scopeCache - Shared scope cache for note-global variables
@@ -137,7 +134,7 @@ function processInlineCodeElement(
 	codeEl: HTMLElement,
 	scope: NumeralsScope,
 	settings: NumeralsSettings,
-	numberFormat: mathjsFormat,
+	formatter: ResultFormatter,
 	preProcessors: StringReplaceMap[],
 	prevResultRef: PrevResultRef,
 	scopeCache: Map<string, NumeralsScope>,
@@ -156,13 +153,13 @@ function processInlineCodeElement(
 		const result = evaluateInlineExpression(
 			parsed.expression,
 			scope,
-			numberFormat,
 			preProcessors,
 			prevResultRef.value,
 			app,
 			sourcePath,
 			settings,
 		);
+		const formattedResult = formatter.format(result.raw);
 		prevResultRef.value = result.raw;
 
 		// Propagate $-prefixed globals for note-wide visibility
@@ -175,7 +172,15 @@ function processInlineCodeElement(
 			addGlobalsToScopeCache(scopeCache, sourcePath, result.globals);
 		}
 
-		renderInlineResult(codeEl, parsed.expression, parsed.mode, parsed.renderStyle, result, settings, preProcessors);
+		renderInlineResult(
+			codeEl,
+			parsed.expression,
+			parsed.mode,
+			parsed.renderStyle,
+			result,
+			formattedResult,
+			settings
+		);
 		return { referencedPaths: result.referencedPaths };
 	} catch {
 		prevResultRef.value = undefined;
@@ -198,7 +203,7 @@ function processInlineCodeElement(
  *
  * @param app - The Obsidian App instance
  * @param settings - Plugin settings (read at call time for hot-reload)
- * @param numberFormat - Number formatting configuration
+ * @param getFormatter - Returns the active shared result formatter
  * @param getPreProcessors - Returns current preprocessing rules (currency, thousands, etc.)
  * @param scopeCache - Shared scope cache for note-global variables
  * @returns The post-processor function (for registration with Plugin.registerMarkdownPostProcessor)
@@ -206,7 +211,7 @@ function processInlineCodeElement(
 export function createInlineNumeralsPostProcessor(
 	app: App,
 	getSettings: () => NumeralsSettings,
-	getNumberFormat: () => mathjsFormat,
+	getFormatter: () => ResultFormatter,
 	getPreProcessors: () => StringReplaceMap[],
 	scopeCache: Map<string, NumeralsScope>
 ): (el: HTMLElement, ctx: MarkdownPostProcessorContext) => void {
@@ -245,7 +250,7 @@ export function createInlineNumeralsPostProcessor(
 				preProcessors
 			);
 
-			const numberFormat = getNumberFormat();
+			const formatter = getFormatter();
 
 			// Track previous result for @prev support.
 			// Resets per section (post-processor call), so @prev only chains
@@ -259,7 +264,7 @@ export function createInlineNumeralsPostProcessor(
 					codeEl,
 					scope,
 					currentSettings,
-					numberFormat,
+					formatter,
 					preProcessors,
 					prevResultRef,
 					scopeCache,

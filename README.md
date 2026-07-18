@@ -60,7 +60,7 @@ Inline Numerals expressions are ordinary inline code with a trigger prefix:
 
 Inline calculations work in Live Preview and Reading mode. They support the same math engine, number formatting, units, currency symbols, variables, frontmatter, and Dataview values as math blocks.
 
-The `#$:` and `#=$:` triggers render the result (and, in equation mode, the expression) as TeX-style MathJax — the same typesetting used by math blocks — chosen per expression rather than through a global setting. All four trigger prefixes are configurable in the Numerals settings.
+The `#$:` and `#=$:` triggers render the result (and, in equation mode, the expression) as TeX-style MathJax, inline with surrounding text in both Live Preview and Reading mode. All four trigger prefixes are configurable in the Numerals settings.
 
 ### Math Blocks
 
@@ -253,6 +253,21 @@ Configure how rendered numbers are displayed:
 - **Exponential**: scientific notation.
 - **Engineering**: exponent is a multiple of 3.
 - **Formatted**: choose a specific thousands/decimal style.
+
+Override formatting for one math block with display-only directives:
+
+````markdown
+```math
+@format comma-period
+@decimalPlaces 2
+subtotal = 1234.5
+third = 1 / 3
+```
+````
+
+`@format` accepts `system`, `fixed`, `exponential` (or `scientific`), `engineering`, `comma-period`, `period-comma`, `space-comma`, and `indian`. `@decimalPlaces` accepts an integer from 0 through 20; `@decimalPlace` is also accepted.
+
+These directives change displayed and inserted results, not values in calculation scope. For computational rounding, use mathjs directly: `round(value, 2)` for numbers or `round(amount, 2, GBP)` for currency Units.
 
 ## Installation
 

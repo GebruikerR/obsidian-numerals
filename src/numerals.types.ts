@@ -1,4 +1,11 @@
 /****************************************************
+ * Shared Type Imports
+ ****************************************************/
+
+import type { ResultFormatOverrides, ResultFormatter } from './formatting/types';
+import type { InvalidFormatDirective } from './processing/formatDirectives';
+
+/****************************************************
  * Error Types
  ****************************************************/
 
@@ -147,8 +154,14 @@ export interface ProcessedBlock {
 	rawRows: string[];
 	/** Processed source string with directives replaced, ready for mathjs evaluation */
 	processedSource: string;
+	/** Source rows preserved for alignment but ignored by evaluator state. */
+	transparentLineIndexes: number[];
 	/** Metadata about special lines (emitters, insertions, etc.) */
 	blockInfo: numeralsBlockInfo;
+	/** Display-only overrides declared by block formatting directives. */
+	formatOverrides: ResultFormatOverrides;
+	/** Invalid formatting directives that prevent block evaluation. */
+	invalidFormatDirectives: InvalidFormatDirective[];
 }
 
 /**
@@ -198,8 +211,10 @@ export interface RenderContext {
 	renderStyle: NumeralsRenderStyle;
 	/** User settings affecting display and formatting */
 	settings: NumeralsSettings;
-	/** Number formatting configuration for displaying results */
-	numberFormat: mathjsFormat;
+	/** Shared result formatter used by every output surface. */
+	formatter: ResultFormatter;
+	/** Display-only overrides applying to the whole block. */
+	formatOverrides: ResultFormatOverrides;
 	/** String replacements to apply (e.g., currency symbols) */
 	preProcessors: StringReplaceMap[];
 }
@@ -245,8 +260,6 @@ export interface InlineNumeralsExpression {
 
 /** Result of evaluating an inline Numerals expression */
 export interface InlineEvaluationResult {
-	/** The formatted result string for display */
-	formatted: string;
 	/** The raw mathjs result value (for chaining via @prev) */
 	raw: unknown;
 	/** Expression after cross-note resolution, preprocessing, and inline directives */

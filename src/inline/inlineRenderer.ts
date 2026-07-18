@@ -1,6 +1,7 @@
-import { NumeralsRenderStyle, StringReplaceMap } from '../numerals.types';
+import { NumeralsRenderStyle } from '../numerals.types';
+import type { FormattedResult } from '../formatting';
 import { mathjaxLoop } from '../rendering/displayUtils';
-import { expressionToTeX, resultToTeX } from '../rendering/texRendering';
+import { expressionToTeX } from '../rendering/texRendering';
 
 function createSpan(parent: HTMLElement, className: string): HTMLElement {
 	const span = parent.ownerDocument.createElement('span');
@@ -25,7 +26,7 @@ function renderTexOrText(
 		const texElement = createSpan(container, 'numerals-tex');
 		// mathjaxLoop is async, so a MathJax failure surfaces as a rejection
 		// that the surrounding try/catch cannot see — fall back to plain text.
-		void mathjaxLoop(texElement, tex).catch(() => {
+		void mathjaxLoop(texElement, tex, false).catch(() => {
 			texElement.textContent = text;
 		});
 	} catch {
@@ -49,28 +50,13 @@ export function renderInlineInputContent(
 
 export function renderInlineValueContent(
 	container: HTMLElement,
-	formattedResult: string,
-	rawResult: unknown,
-	renderStyle: NumeralsRenderStyle,
-	preProcessors: StringReplaceMap[]
+	formattedResult: FormattedResult,
+	renderStyle: NumeralsRenderStyle
 ): void {
 	renderTexOrText(
 		container,
-		formattedResult,
+		formattedResult.text,
 		renderStyle,
-		() => resultToTeX(rawResult, preProcessors)
-	);
-}
-
-export function preProcessorsEqual(
-	a: StringReplaceMap[],
-	b: StringReplaceMap[]
-): boolean {
-	return (
-		a.length === b.length &&
-		a.every((processor, index) => (
-			processor.regex.toString() === b[index].regex.toString() &&
-			processor.replaceStr === b[index].replaceStr
-		))
+		() => formattedResult.tex
 	);
 }

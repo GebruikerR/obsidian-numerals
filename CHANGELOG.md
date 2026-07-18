@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file. The format 
 
 ### Added
 - Per-expression TeX rendering for Inline Numerals via the new `#$:` (result only) and `#=$:` (equation) trigger prefixes, which render with MathJax in both Live Preview and Reading mode. Both prefixes are configurable in settings. (Closes #161)
+- Block-level `@format` and `@decimalPlaces` directives for overriding result presentation without changing calculated values. (Closes #75, #140)
+
+### Changed
+- Centralized block, inline, TeX, and result-insertion formatting behind one result-formatting pipeline so evaluation always retains raw mathjs values.
+
+### Fixed
+- Inline TeX triggers now use MathJax's inline mode in Reading mode and Live Preview instead of rendering as centered display math.
 
 ## [1.10.2] - 2026-05-19
 

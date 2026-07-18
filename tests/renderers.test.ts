@@ -26,15 +26,17 @@ import {
 	SyntaxHighlightRenderer,
 	RendererFactory,
 } from '../src/renderers';
+import { renderMath } from 'obsidian';
 import * as math from 'mathjs';
 import {
 	LineRenderData,
 	RenderContext,
 	NumeralsRenderStyle,
+	NumeralsNumberFormat,
 	DEFAULT_SETTINGS,
 } from '../src/numerals.types';
 import { expressionToTeX, resultToTeX } from '../src/rendering/texRendering';
-import { getLocaleFormatter } from '../src/numeralsUtilities';
+import { createNumberFormatProfile, createResultFormatter } from '../src/formatting';
 
 // Mock Obsidian DOM methods
 beforeAll(() => {
@@ -82,7 +84,10 @@ describe('Renderer Implementations', () => {
 		context = {
 			renderStyle: NumeralsRenderStyle.Plain,
 			settings: DEFAULT_SETTINGS,
-			numberFormat: getLocaleFormatter(),
+			formatter: createResultFormatter({
+				profile: createNumberFormatProfile(NumeralsNumberFormat.System),
+			}),
+			formatOverrides: {},
 			preProcessors: [],
 		};
 	});
@@ -314,6 +319,7 @@ describe('Renderer Implementations', () => {
 		let renderer: TeXRenderer;
 
 		beforeEach(() => {
+			jest.clearAllMocks();
 			renderer = new TeXRenderer();
 		});
 
@@ -354,6 +360,8 @@ describe('Renderer Implementations', () => {
 			expect(texSpans.length).toBe(2); // input and result
 			expect(input?.textContent).toContain('TeX:2+2');
 			expect(result?.textContent).toContain('TeX:4');
+			expect(renderMath).toHaveBeenNthCalledWith(1, '2+2', true);
+			expect(renderMath).toHaveBeenNthCalledWith(2, '4', true);
 		});
 
 		it('should render empty line', () => {

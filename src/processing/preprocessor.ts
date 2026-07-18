@@ -1,4 +1,23 @@
-import { StringReplaceMap, numeralsBlockInfo } from '../numerals.types';
+import {
+	NumeralsNumberFormat,
+	ProcessedBlock,
+	StringReplaceMap,
+} from '../numerals.types';
+import {
+	BlockNumberFormat,
+	collectFormatDirectives,
+} from './formatDirectives';
+
+const blockNumberFormatMap: Record<BlockNumberFormat, NumeralsNumberFormat> = {
+	system: NumeralsNumberFormat.System,
+	fixed: NumeralsNumberFormat.Fixed,
+	exponential: NumeralsNumberFormat.Exponential,
+	engineering: NumeralsNumberFormat.Engineering,
+	'comma-period': NumeralsNumberFormat.Format_CommaThousands_PeriodDecimal,
+	'period-comma': NumeralsNumberFormat.Format_PeriodThousands_CommaDecimal,
+	'space-comma': NumeralsNumberFormat.Format_SpaceThousands_CommaDecimal,
+	indian: NumeralsNumberFormat.Format_Indian,
+};
 
 /**
  * Process a block of text to convert from Numerals syntax to MathJax syntax
@@ -26,18 +45,16 @@ export function replaceStringsInTextFromMap(text: string, stringReplaceMap: Stri
 export function preProcessBlockForNumeralsDirectives(
 	source: string,
 	preProcessors: StringReplaceMap[] | undefined,
-): {
-	rawRows: string[],
-	processedSource: string,
-	blockInfo: numeralsBlockInfo
-} {
+): ProcessedBlock {
 
 	const rawRows: string[] = source.split("\n");
-	let processedSource:string = source;
+	const formatDirectives = collectFormatDirectives(source);
+	let processedSource:string = formatDirectives.sourceWithoutDirectives;
 
 	const emitter_lines: number[] = [];
 	const insertion_lines: number[] = [];
 	const hidden_lines: number[] = [];
+	hidden_lines.push(...formatDirectives.directiveLineIndexes);
 	let shouldHideNonEmitterLines = false;
 
 	// Find emitter and result insertion lines before modifying source
@@ -89,6 +106,14 @@ export function preProcessBlockForNumeralsDirectives(
 	return {
 		rawRows,
 		processedSource,
+		transparentLineIndexes: formatDirectives.directiveLineIndexes,
+		formatOverrides: {
+			numberFormat: formatDirectives.format === undefined
+				? undefined
+				: blockNumberFormatMap[formatDirectives.format],
+			decimalPlaces: formatDirectives.decimalPlaces,
+		},
+		invalidFormatDirectives: formatDirectives.invalidDirectives,
 		blockInfo: {
 			emitter_lines,
 			insertion_lines,
