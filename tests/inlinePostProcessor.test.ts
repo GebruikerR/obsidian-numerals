@@ -25,6 +25,7 @@ jest.mock(
 );
 
 import * as math from 'mathjs';
+import { renderMath } from 'obsidian';
 import { defaultCurrencyMap } from '../src/rendering/displayUtils';
 import {
 	NumeralsSettings,
@@ -72,6 +73,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+	jest.clearAllMocks();
 	mockRegisteredEvents.length = 0;
 });
 
@@ -212,6 +214,7 @@ describe('inline numerals integration', () => {
 			const texValue = code.querySelector('.numerals-inline-value .numerals-tex');
 			expect(texValue).not.toBeNull();
 			expect(texValue?.textContent).toBe('TeX:36~\\mathrm{inches}');
+			expect(renderMath).toHaveBeenCalledWith('36~\\mathrm{inches}', false);
 		});
 
 		it('renders "#=$:" equation input and result with MathJax in Reading mode', async () => {
@@ -222,6 +225,8 @@ describe('inline numerals integration', () => {
 			expect(code.querySelector('.numerals-inline-input .numerals-tex')?.textContent).toBe('TeX:\\sqrt{144}');
 			expect(code.querySelector('.numerals-inline-separator')?.textContent).toBe(' = ');
 			expect(code.querySelector('.numerals-inline-value .numerals-tex')?.textContent).toBe('TeX:12');
+			expect(renderMath).toHaveBeenNthCalledWith(1, '\\sqrt{144}', false);
+			expect(renderMath).toHaveBeenNthCalledWith(2, '12', false);
 		});
 
 		it('renders plain "#:" results as text, without any MathJax span', () => {

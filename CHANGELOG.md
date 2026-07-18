@@ -13,6 +13,9 @@ All notable changes to this project will be documented in this file. The format 
 - Centralized block, inline, TeX, and result-insertion formatting behind one result-formatting pipeline so evaluation always retains raw mathjs values.
 - Result insertion continues to persist currency codes even when configured-symbol display is enabled.
 
+### Fixed
+- Inline TeX triggers now use MathJax's inline mode in Reading mode and Live Preview instead of rendering as centered display math.
+
 ## [1.10.2] - 2026-05-19
 
 ### Changed

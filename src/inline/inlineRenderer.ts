@@ -26,7 +26,7 @@ function renderTexOrText(
 		const texElement = createSpan(container, 'numerals-tex');
 		// mathjaxLoop is async, so a MathJax failure surfaces as a rejection
 		// that the surrounding try/catch cannot see — fall back to plain text.
-		void mathjaxLoop(texElement, tex).catch(() => {
+		void mathjaxLoop(texElement, tex, false).catch(() => {
 			texElement.textContent = text;
 		});
 	} catch {
