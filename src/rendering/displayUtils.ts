@@ -122,9 +122,13 @@ export function htmlToElements(html: string): DocumentFragment {
 	return sanitizedHTML;
   }
 
-export async function mathjaxLoop(container: HTMLElement, value: string) {
-	const html = renderMath(value, true);
-	await finishRenderMath()
+export async function mathjaxLoop(
+	container: HTMLElement,
+	value: string,
+	displayMode = true
+): Promise<void> {
+	const html = renderMath(value, displayMode);
+	await finishRenderMath();
 
 	// container.empty();
 	container.append(html);

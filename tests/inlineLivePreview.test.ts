@@ -35,6 +35,10 @@ beforeAll(() => {
 	(globalThis as { activeDocument?: Document }).activeDocument = document;
 });
 
+beforeEach(() => {
+	jest.clearAllMocks();
+});
+
 function formatted(
 	text: string,
 	tex: string = text,
@@ -157,6 +161,7 @@ describe('InlineNumeralsWidget', () => {
 
 			expect(el.classList.contains('numerals-inline-result')).toBe(true);
 			expect(el.querySelector('.numerals-inline-value .numerals-tex')?.textContent).toBe('TeX:36');
+			expect(renderMath).toHaveBeenCalledWith('36', false);
 		});
 
 		it('should render equation mode with input, separator, and value spans', () => {
@@ -198,6 +203,8 @@ describe('InlineNumeralsWidget', () => {
 			expect(el.querySelector('.numerals-inline-input .numerals-tex')?.textContent).toBe('TeX:\\sqrt{144}');
 			expect(el.querySelector('.numerals-inline-separator')?.textContent).toBe(' = ');
 			expect(el.querySelector('.numerals-inline-value .numerals-tex')?.textContent).toBe('TeX:12');
+			expect(renderMath).toHaveBeenNthCalledWith(1, '\\sqrt{144}', false);
+			expect(renderMath).toHaveBeenNthCalledWith(2, '12', false);
 		});
 
 		it('should create widget nodes from the editor ownerDocument', () => {

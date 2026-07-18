@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file. The format 
 ### Changed
 - Centralized block, inline, TeX, and result-insertion formatting behind one result-formatting pipeline so evaluation always retains raw mathjs values.
 
+### Fixed
+- Inline TeX triggers now use MathJax's inline mode in Reading mode and Live Preview instead of rendering as centered display math.
+
 ## [1.10.2] - 2026-05-19
 
 ### Changed

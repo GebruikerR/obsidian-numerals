@@ -26,6 +26,7 @@ import {
 	SyntaxHighlightRenderer,
 	RendererFactory,
 } from '../src/renderers';
+import { renderMath } from 'obsidian';
 import * as math from 'mathjs';
 import {
 	LineRenderData,
@@ -318,6 +319,7 @@ describe('Renderer Implementations', () => {
 		let renderer: TeXRenderer;
 
 		beforeEach(() => {
+			jest.clearAllMocks();
 			renderer = new TeXRenderer();
 		});
 
@@ -358,6 +360,8 @@ describe('Renderer Implementations', () => {
 			expect(texSpans.length).toBe(2); // input and result
 			expect(input?.textContent).toContain('TeX:2+2');
 			expect(result?.textContent).toContain('TeX:4');
+			expect(renderMath).toHaveBeenNthCalledWith(1, '2+2', true);
+			expect(renderMath).toHaveBeenNthCalledWith(2, '4', true);
 		});
 
 		it('should render empty line', () => {
