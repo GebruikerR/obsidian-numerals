@@ -103,6 +103,21 @@ describe('ResultFormatter', () => {
 		expect(value.toNumber('m')).not.toBe(0.33);
 	});
 
+	it('preserves arbitrary-precision Unit values in TeX', () => {
+		const profile = createNumberFormatProfile(
+			NumeralsNumberFormat.Fixed,
+			'en-US'
+		);
+		const formatter = createResultFormatter({ profile });
+		const numericValue = math.bignumber('1e400');
+		const value = math.unit(numericValue, 'm');
+
+		const formatted = formatter.format(value, { decimalPlaces: 2 });
+
+		expect(formatted.tex).toBe(`${numericValue.toFixed(2)}~\\mathrm{m}`);
+		expect(formatted.tex).not.toContain('infty');
+	});
+
 	it('preserves decimal padding in collection and complex TeX', () => {
 		const profile = createNumberFormatProfile(
 			NumeralsNumberFormat.Fixed,

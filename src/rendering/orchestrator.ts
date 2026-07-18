@@ -264,7 +264,8 @@ export function processAndRenderNumeralsBlockFromSource(
 	// Phase 5: Evaluate
 	const evaluationResult = evaluateMathFromSourceStrings(
 		processedBlock.processedSource,
-		scope
+		scope,
+		processedBlock.transparentLineIndexes
 	);
 
 	// Phase 6: Handle side effects (result insertions)

@@ -220,6 +220,8 @@ export interface ProcessedBlock {
 	rawRows: string[];
 	/** Processed source string with directives replaced, ready for mathjs evaluation */
 	processedSource: string;
+	/** Source rows preserved for alignment but ignored by evaluator state. */
+	transparentLineIndexes: number[];
 	/** Metadata about special lines (emitters, insertions, etc.) */
 	blockInfo: numeralsBlockInfo;
 	/** Display-only overrides declared by block formatting directives. */

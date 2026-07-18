@@ -273,6 +273,7 @@ value = 2`;
 		const result = preProcessBlockForNumeralsDirectives(sampleBlock, undefined);
 
 		expect(result.processedSource).toBe("value = 1\n\n\nvalue = 2");
+		expect(result.transparentLineIndexes).toEqual([1, 2]);
 		expect(result.blockInfo.hidden_lines).toEqual([1, 2]);
 		expect(result.formatOverrides).toEqual({
 			numberFormat: NumeralsNumberFormat.Exponential,
@@ -852,6 +853,38 @@ result = __prev + 5`;
 		const { results, inputs } = evaluateMathFromSourceStrings(processedSource, scope);
 		expect(results).toEqual([10, 20, 30, 35]);
 		expect(inputs).toEqual(["value = 10", "doubled = __prev * 2", "tripled = __prev * 1.5", "result = __prev + 5"]);
+	});
+
+	it("should keep formatting directives transparent to @prev", () => {
+		const processedBlock = preProcessBlockForNumeralsDirectives(
+			"value = 10\n@format fixed\ndoubled = @prev * 2",
+			undefined
+		);
+
+		const { results, errorMsg } = evaluateMathFromSourceStrings(
+			processedBlock.processedSource,
+			scope,
+			processedBlock.transparentLineIndexes
+		);
+
+		expect(errorMsg).toBeNull();
+		expect(results).toEqual([10, undefined, 20]);
+	});
+
+	it("should keep formatting directives transparent to @total", () => {
+		const processedBlock = preProcessBlockForNumeralsDirectives(
+			"1\n2\n@decimalPlaces 2\n@total",
+			undefined
+		);
+
+		const { results, errorMsg } = evaluateMathFromSourceStrings(
+			processedBlock.processedSource,
+			scope,
+			processedBlock.transparentLineIndexes
+		);
+
+		expect(errorMsg).toBeNull();
+		expect(results).toEqual([1, 2, undefined, 3]);
 	});
 	
 	it("should handle error when @prev is used on the first line", () => {

@@ -315,8 +315,12 @@ function formatOverrideAsTeX(
 	if (math.isUnit(value)) {
 		try {
 			const units = value.formatUnits();
-			const numericValue = value.toNumber(units);
-			const numberTex = numberToTeX(numericValue, profile, decimalPlaces);
+			const numericValue = value.toNumeric(units);
+			const numberTex = numericValueToTeX(
+				numericValue,
+				profile,
+				decimalPlaces
+			);
 			let unitExpression = `1 ${units}`;
 			unitExpression = applyPreProcessors(unitExpression, preProcessors);
 			const unitTex = texCurrencyReplacement(
@@ -342,6 +346,20 @@ function formatOverrideAsTeX(
 		// mathjs result types cannot be round-tripped through expression text.
 		return resultToTeX(value, preProcessors);
 	}
+}
+
+function numericValueToTeX(
+	value: number | math.BigNumber | math.Fraction,
+	profile: NumberFormatProfile,
+	decimalPlaces: number | undefined
+): string {
+	if (math.isBigNumber(value)) {
+		return bigNumberToTeX(value, profile, decimalPlaces);
+	}
+	if (math.isFraction(value)) {
+		return numberToTeX(Number(value.valueOf()), profile, decimalPlaces);
+	}
+	return numberToTeX(value, profile, decimalPlaces);
 }
 
 function numberToTeX(

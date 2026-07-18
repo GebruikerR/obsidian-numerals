@@ -30,6 +30,7 @@ describe('Rendering Pipeline Types', () => {
 			const processedBlock: ProcessedBlock = {
 				rawRows: ['line1', 'line2'],
 				processedSource: 'processed\nsource',
+				transparentLineIndexes: [],
 				blockInfo: {
 					emitter_lines: [1],
 					insertion_lines: [],
@@ -49,6 +50,7 @@ describe('Rendering Pipeline Types', () => {
 			const processedBlock: ProcessedBlock = {
 				rawRows: [],
 				processedSource: '',
+				transparentLineIndexes: [],
 				blockInfo: {
 					emitter_lines: [],
 					insertion_lines: [],
@@ -270,6 +272,7 @@ describe('Type Compatibility', () => {
 		const processedBlock: ProcessedBlock = {
 			rawRows,
 			processedSource,
+			transparentLineIndexes: [],
 			blockInfo,
 			formatOverrides: {},
 			invalidFormatDirectives: [],

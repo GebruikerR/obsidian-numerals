@@ -106,6 +106,7 @@ export function preProcessBlockForNumeralsDirectives(
 	return {
 		rawRows,
 		processedSource,
+		transparentLineIndexes: formatDirectives.directiveLineIndexes,
 		formatOverrides: {
 			numberFormat: formatDirectives.format === undefined
 				? undefined
