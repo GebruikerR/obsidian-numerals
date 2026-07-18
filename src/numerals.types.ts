@@ -50,6 +50,19 @@ export enum NumeralsNumberFormat {
 	Format_Indian = "Format_Indian"
 }
 
+export enum CurrencyPrecisionMode {
+	FollowNumberFormat = 'follow-number-format',
+	CurrencyStandard = 'currency-standard',
+}
+
+export enum CurrencyDisplayMode {
+	Code = 'code',
+	Symbol = 'symbol',
+}
+
+export const MIN_CURRENCY_DECIMAL_PLACES = 0;
+export const MAX_CURRENCY_DECIMAL_PLACES = 20;
+
 interface CurrencySymbolMapping {
 	symbol: string;
 	currency: string; // ISO 4217 Currency Code
@@ -67,6 +80,9 @@ export interface NumeralsSettings {
 	provideSuggestions: boolean;
 	suggestionsIncludeMathjsSymbols: boolean;
 	numberFormat: NumeralsNumberFormat;
+	currencyPrecisionMode: CurrencyPrecisionMode;
+	currencyDisplayMode: CurrencyDisplayMode;
+	customCurrencyDecimalPlaces: number;
 	forceProcessAllFrontmatter: boolean;
 	customCurrencySymbol: CurrencyType | null;
 	enableGreekAutoComplete: boolean;
@@ -95,6 +111,9 @@ export const DEFAULT_SETTINGS: NumeralsSettings = {
 	provideSuggestions: 				true,
 	suggestionsIncludeMathjsSymbols: 	false,
 	numberFormat: 						NumeralsNumberFormat.System,
+	currencyPrecisionMode: 			CurrencyPrecisionMode.CurrencyStandard,
+	currencyDisplayMode: 			CurrencyDisplayMode.Code,
+	customCurrencyDecimalPlaces: 	2,
 	forceProcessAllFrontmatter: 		false,
 	customCurrencySymbol: 				null,
 	enableGreekAutoComplete: 			true,
@@ -108,6 +127,53 @@ export const DEFAULT_SETTINGS: NumeralsSettings = {
 	provideInlineSuggestions:			true,
 	// Cross-note reference settings
 	enableCrossNoteReferences:			true,
+}
+
+/**
+ * Repair invalid persisted currency-formatting settings in place.
+ * Missing properties are left untouched so older settings files can inherit
+ * current defaults without being rewritten merely by loading Numerals.
+ *
+ * @returns Whether any present property was repaired.
+ */
+export function normalizeCurrencyFormattingSettings(
+	data: Record<string, unknown>
+): boolean {
+	let changed = false;
+	const hasOwn = (key: string): boolean => Object.prototype.hasOwnProperty.call(data, key);
+
+	if (
+		hasOwn('currencyPrecisionMode') &&
+		data['currencyPrecisionMode'] !== CurrencyPrecisionMode.FollowNumberFormat &&
+		data['currencyPrecisionMode'] !== CurrencyPrecisionMode.CurrencyStandard
+	) {
+		data['currencyPrecisionMode'] = DEFAULT_SETTINGS.currencyPrecisionMode;
+		changed = true;
+	}
+
+	if (
+		hasOwn('currencyDisplayMode') &&
+		data['currencyDisplayMode'] !== CurrencyDisplayMode.Code &&
+		data['currencyDisplayMode'] !== CurrencyDisplayMode.Symbol
+	) {
+		data['currencyDisplayMode'] = DEFAULT_SETTINGS.currencyDisplayMode;
+		changed = true;
+	}
+
+	if (hasOwn('customCurrencyDecimalPlaces')) {
+		const decimalPlaces = data['customCurrencyDecimalPlaces'];
+		if (
+			typeof decimalPlaces !== 'number' ||
+			!Number.isInteger(decimalPlaces) ||
+			decimalPlaces < MIN_CURRENCY_DECIMAL_PLACES ||
+			decimalPlaces > MAX_CURRENCY_DECIMAL_PLACES
+		) {
+			data['customCurrencyDecimalPlaces'] = DEFAULT_SETTINGS.customCurrencyDecimalPlaces;
+			changed = true;
+		}
+	}
+
+	return changed;
 }
 
 

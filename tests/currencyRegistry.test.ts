@@ -47,6 +47,18 @@ describe('CurrencyRegistry', () => {
 		expect(registry.get('KWD')?.fractionDigits).toBe(3);
 	});
 
+	it.each([-1, 1.5, 21])(
+		'ignores invalid configured fraction digit value %s',
+		(configuredDigits) => {
+			const registry = CurrencyRegistry.create(currencyMap, {
+				locale: 'en-US',
+				fractionDigitsByCode: new Map([['GBP', configuredDigits]]),
+			});
+
+			expect(registry.get('GBP')?.fractionDigits).toBe(2);
+		}
+	);
+
 	it('matches scalar-derived currency through public Unit APIs', () => {
 		const registry = CurrencyRegistry.create(currencyMap);
 		const remaining = math.unit(80, 'GBP');

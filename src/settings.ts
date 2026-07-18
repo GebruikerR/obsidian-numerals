@@ -5,13 +5,21 @@
 import NumeralsPlugin from "./main";
 import { NumeralsSuggestor } from "./NumeralsSuggestor";
 import { htmlToElements } from "./rendering/displayUtils";
-import { NumeralsRenderStyle, NumeralsNumberFormat, NumeralsLayout } from "./numerals.types";
+import {
+	CurrencyDisplayMode,
+	CurrencyPrecisionMode,
+	MAX_CURRENCY_DECIMAL_PLACES,
+	MIN_CURRENCY_DECIMAL_PLACES,
+	NumeralsRenderStyle,
+	NumeralsNumberFormat,
+	NumeralsLayout,
+} from "./numerals.types";
 
 import {
-    PluginSettingTab,
-    App,
-    Setting,
-	ButtonComponent, TextComponent
+	PluginSettingTab,
+	App,
+	Setting,
+	ButtonComponent, DropdownComponent, TextComponent
  } from "obsidian";
 
 ///////////////////////////////////////////
@@ -231,6 +239,7 @@ export class NumeralsSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setHeading()
 			.setName("Number and currency formatting");
+		let customCurrencyDecimalPlacesDropDown: DropdownComponent | null = null;
 
 		new Setting(containerEl)
 			.setName('Rendered number format')
@@ -255,6 +264,68 @@ export class NumeralsSettingTab extends PluginSettingTab {
 					this.plugin.updateLocale();
 				});
 			})
+
+		new Setting(containerEl)
+			.setName('Currency precision')
+			.setDesc('Choose whether pure currency results follow the rendered number format or use standard currency decimal places, such as 2 for GBP and 0 for JPY.') // eslint-disable-line obsidianmd/ui/sentence-case
+			.addDropdown(dropDown => {
+				dropDown.addOption(
+					CurrencyPrecisionMode.FollowNumberFormat,
+					'Use rendered number format'
+				);
+				dropDown.addOption(
+					CurrencyPrecisionMode.CurrencyStandard,
+					'Use currency standard'
+				);
+				dropDown.setValue(this.plugin.settings.currencyPrecisionMode);
+				dropDown.onChange(async (value) => {
+					const precisionMode = value as CurrencyPrecisionMode;
+					this.plugin.settings.currencyPrecisionMode = precisionMode;
+					await this.plugin.saveSettings();
+					this.plugin.updateFormatting();
+					customCurrencyDecimalPlacesDropDown?.setDisabled(
+						precisionMode !== CurrencyPrecisionMode.CurrencyStandard
+					);
+				});
+			});
+
+		new Setting(containerEl)
+			.setName('Currency display')
+			.setDesc('Choose whether pure currency results use their unit code or the symbol configured in Numerals. Compound units continue to use codes.') // eslint-disable-line obsidianmd/ui/sentence-case
+			.addDropdown(dropDown => {
+				dropDown.addOption(CurrencyDisplayMode.Code, 'Currency code (GBP)'); // eslint-disable-line obsidianmd/ui/sentence-case
+				dropDown.addOption(CurrencyDisplayMode.Symbol, 'Configured symbol (£)');
+				dropDown.setValue(this.plugin.settings.currencyDisplayMode);
+				dropDown.onChange(async (value) => {
+					this.plugin.settings.currencyDisplayMode = value as CurrencyDisplayMode;
+					await this.plugin.saveSettings();
+					this.plugin.updateFormatting();
+				});
+			});
+
+		new Setting(containerEl)
+			.setName('Custom currency decimal places')
+			.setDesc('Decimal places to use for a custom currency mapping. Standard currencies use their own currency-standard value.')
+			.addDropdown(dropDown => {
+				for (
+					let decimalPlaces = MIN_CURRENCY_DECIMAL_PLACES;
+					decimalPlaces <= MAX_CURRENCY_DECIMAL_PLACES;
+					decimalPlaces++
+				) {
+					const value = String(decimalPlaces);
+					dropDown.addOption(value, value);
+				}
+				dropDown.setValue(String(this.plugin.settings.customCurrencyDecimalPlaces));
+				dropDown.setDisabled(
+					this.plugin.settings.currencyPrecisionMode !== CurrencyPrecisionMode.CurrencyStandard
+				);
+				dropDown.onChange(async (value) => {
+					this.plugin.settings.customCurrencyDecimalPlaces = Number(value);
+					await this.plugin.saveSettings();
+					this.plugin.updateFormatting();
+				});
+				customCurrencyDecimalPlacesDropDown = dropDown;
+			});
 
 		new Setting(containerEl)
 			.setName('`$` symbol currency mapping')

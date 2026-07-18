@@ -10,7 +10,7 @@ This architecture addresses three related requests:
 - Currency-aware precision, symbols, and derived currency values (#160).
 - Consistent result presentation in blocks, inline Numerals, TeX, and result insertion.
 
-The work is split into two stacked pull requests. PR 1 introduces the shared formatting boundary and block directives. PR 2 adds opt-in currency presentation policies.
+The work is split into two stacked pull requests. PR 1 introduces the shared formatting boundary and block directives. PR 2 adds currency presentation policies.
 
 ## Formatting boundary
 
@@ -137,14 +137,19 @@ A result is pure currency when its dimensions equal one active currency unit. Th
 
 Mathjs cannot remove registered units. Rebuilding the immutable registry changes which units receive currency presentation, even though stale mathjs unit definitions may remain until Obsidian reloads.
 
-## Currency presentation (PR 2)
+## Currency presentation
 
-PR 2 adds two independent settings:
+Currency presentation uses two independent settings. Their persisted values are intentionally explicit:
+
+- `currencyPrecisionMode`: `follow-number-format` or `currency-standard`.
+- `currencyDisplayMode`: `code` or `symbol`.
+
+Older settings files omit these keys and inherit the current defaults without being rewritten on load. Present but invalid values are repaired to the current defaults. The custom decimal-place value must be an integer from 0 through 20; invalid persisted values are repaired to 2.
 
 ### Currency decimal places
 
-- `Use rendered number format` is the compatibility default.
-- `Use currency standard` uses ISO 4217 minor units obtained from `Intl.NumberFormat.resolvedOptions()`.
+- `Use currency standard` is the default and uses ISO 4217 minor units obtained from `Intl.NumberFormat.resolvedOptions()`.
+- `Use rendered number format` applies the general number-format behavior to currency values.
 
 Examples of standard digits:
 
@@ -152,11 +157,11 @@ Examples of standard digits:
 - JPY: 0
 - KWD: 3
 
-Custom/non-ISO currencies default to 2 and expose a validated custom decimal-place setting from 0 through 20.
+Custom currencies default to 2 and expose a validated custom decimal-place setting from 0 through 20. The custom value is only relevant when currency-standard precision is active.
 
 ### Currency display
 
-- `ISO code` is the compatibility default, such as `12.50 GBP`.
+- `ISO code` remains the default, such as `12.50 GBP`.
 - `Configured symbol` uses the symbol in Numerals' active currency map.
 
 Symbol placement comes from `Intl.NumberFormat.formatToParts()`. The formatter replaces only the `currency` part with the configured symbol. This preserves locale order, spacing, digits, signs, and bidirectional marks without accepting Intl's choice of symbol. For example, a `$` mapping to CAD continues to display the configured `$`, not an automatically selected `CA$`.
@@ -169,7 +174,9 @@ Symbol placement comes from `Intl.NumberFormat.formatToParts()`. The formatter r
 - TeX uses the same rounding decision, with a period decimal and no locale grouping.
 - Result insertion continues using an ISO/custom unit code, never a display symbol.
 
-Compatibility defaults mean users see no currency presentation change until they opt in.
+Currency-standard precision applies by default. Configured-symbol display remains opt-in; currency codes are displayed and inserted unless the user selects symbols for display.
+
+Changing a currency presentation setting rebuilds the immutable registry and formatter immediately. The settings tab continues to use its imperative implementation so Numerals can retain its existing minimum Obsidian version.
 
 ## Rounding versus display formatting
 
@@ -209,10 +216,10 @@ PR 1 requirements:
 - No mathjs formatter or Unit internal is patched for presentation.
 - Only explicit block directives change output.
 
-PR 2 requirements:
+Currency-policy requirements:
 
-- Currency code and current number-format behavior remain the defaults.
-- Automatic currency digits and configured symbols are opt-in.
+- Currency-standard precision and currency-code display are the defaults.
+- Configured symbols are opt-in, and users can select rendered-number precision when desired.
 - The settings tab stays on the imperative API because `minAppVersion` remains below Obsidian 1.13.0.
 - Symbol/unit remapping retains the existing reload requirement where mathjs aliases cannot be removed safely.
 

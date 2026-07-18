@@ -16,10 +16,10 @@
 | Show-your-work equations | `` `#=: 2 * (3ft + 4ft)` `` -> `2 * (3 ft + 4 ft) = 14 ft` |
 | Full math blocks | <code>```math<br>20 mi / 4 hr to m/s<br>```</code> -> `2.235 m / s` |
 | Units and conversions | `100 km/hr in mi/hr` -> `62.137 mi / hr` |
-| Currency math | `$100/hr * 3 days` -> `7,200 USD` |
+| Currency math | `$100/hr * 3 days` -> `7,200.00 USD` |
 | Note-wide variables | `$rate = $150/hr`, then `` `#: $rate * 40hr` `` |
 | Cross-note references | `[[Client Settings]].rates.hourly * 8hr` |
-| Result insertion | `@[profit] = revenue - expenses` writes `@[profit::10 USD]` |
+| Result insertion | `@[profit] = revenue - expenses` writes `@[profit::10.00 USD]` |
 
 ## Quick Start
 
@@ -88,8 +88,8 @@ Numerals uses [mathjs](https://mathjs.org/) for calculations and adds Obsidian-f
 | --- | --- |
 | Units | `1ft + 12in` -> `2 ft` |
 | Conversions | `72 degF to degC` -> `22.222 degC` |
-| Currency | `$1,000 * 2` -> `2,000 USD` |
-| Rates | `$100/hr * 3 days` -> `7,200 USD` |
+| Currency | `$1,000 * 2` -> `2,000.00 USD` |
+| Rates | `$100/hr * 3 days` -> `7,200.00 USD` |
 | Functions | `sqrt(144)`, `sin(pi/2)`, `log(1000, 10)` |
 | Bases | `0xff + 0b100` -> `259` |
 | Fractions | `fraction(1/3) + fraction(1/4)` -> `7/12` |
@@ -197,7 +197,7 @@ Use `@[label]` to write a result back into the raw note as Dataview-style inline
 Numerals updates the source text to:
 
 ```markdown
-@[profit::1,550 USD]
+@[profit::1550.00 USD]
 ```
 
 ### Auto-Complete
@@ -268,6 +268,26 @@ third = 1 / 3
 `@format` accepts `system`, `fixed`, `exponential` (or `scientific`), `engineering`, `comma-period`, `period-comma`, `space-comma`, and `indian`. `@decimalPlaces` accepts an integer from 0 through 20; `@decimalPlace` is also accepted.
 
 These directives change displayed and inserted results, not values in calculation scope. For computational rounding, use mathjs directly: `round(value, 2)` for numbers or `round(amount, 2, GBP)` for currency Units.
+
+### Currency Formatting
+
+Currency results use **Currency standard** precision and **Currency code** display by default. Pure currency values therefore render with the conventional number of decimal places for their currency while keeping an unambiguous unit code.
+
+Examples of the default precision are:
+
+- GBP and USD use 2 places: `120.00 GBP`
+- JPY uses 0 places: `120 JPY`
+- KWD uses 3 places: `120.000 KWD`
+
+A custom currency mapping uses the configured **Custom currency decimal places** value, from 0 through 20. This setting is enabled when currency-standard precision is selected.
+
+Choose **Use rendered number format** when currency values should instead follow the general number-format behavior used by other Units.
+
+Choose **Configured symbol** to display the symbol from Numerals' active currency mapping instead of its code. Symbol order, spacing, digits, and signs follow the selected locale, while the configured symbol itself is preserved. For example, a `$` mapping to CAD still uses `$`, rather than substituting `CA$`.
+
+Currency presentation applies to pure currency results, including derived values such as `remaining / 8`. Compound rates such as `GBP / hour` retain the general number format and code. A block-level `@decimalPlaces` directive takes precedence over currency-standard digits.
+
+Result insertion always writes the currency code, never a display symbol. For example, a result displayed as `£12.50` is inserted as `12.50 GBP`.
 
 ## Installation
 

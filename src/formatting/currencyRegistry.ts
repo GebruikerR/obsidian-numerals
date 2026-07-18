@@ -6,6 +6,8 @@ import type {
 } from './types';
 
 const DEFAULT_CURRENCY_FRACTION_DIGITS = 2;
+const MIN_CURRENCY_FRACTION_DIGITS = 0;
+const MAX_CURRENCY_FRACTION_DIGITS = 20;
 
 export interface CurrencyRegistryOptions {
 	locale?: string;
@@ -52,14 +54,17 @@ export class CurrencyRegistry {
 			}
 
 			const configuredDigits = options.fractionDigitsByCode?.get(code);
-			const fractionDigits = configuredDigits ??
+			const fractionDigits = isValidFractionDigits(configuredDigits)
+				? configuredDigits
+				: undefined;
+			const resolvedFractionDigits = fractionDigits ??
 				getCurrencyFractionDigits(code, options.locale);
 
 			definitionsByCode.set(code, {
 				code,
 				symbol: entry.symbol,
 				texCommand: `\\${entry.name}`,
-				fractionDigits,
+				fractionDigits: resolvedFractionDigits,
 				unit,
 			});
 		}
@@ -96,6 +101,13 @@ export class CurrencyRegistry {
 
 		return undefined;
 	}
+}
+
+function isValidFractionDigits(value: number | undefined): value is number {
+	return value !== undefined &&
+		Number.isInteger(value) &&
+		value >= MIN_CURRENCY_FRACTION_DIGITS &&
+		value <= MAX_CURRENCY_FRACTION_DIGITS;
 }
 
 function getCurrencyFractionDigits(code: string, locale?: string): number {
