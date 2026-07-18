@@ -156,7 +156,7 @@ describe('parseInlineExpression', () => {
 
 	// --- Trigger precedence (critical!) ------------------------------------
 	describe('trigger precedence', () => {
-		it('should check "#=:" before "#:" so "#=: 5*3" is Equation mode', () => {
+		it('should parse "#=: 5*3" as Equation mode', () => {
 			const result = parse('#=: 5*3');
 			expect(result).not.toBeNull();
 			expect(result!.mode).toBe(InlineNumeralsMode.Equation);

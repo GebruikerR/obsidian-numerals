@@ -179,7 +179,10 @@ describe('inline numerals integration', () => {
 	describe('TeX rendering mode', () => {
 		// TeX rendering is chosen per-expression via the `#$:` / `#$=:` triggers,
 		// not a global setting. Uses DEFAULT_SETTINGS trigger prefixes unchanged.
-		function createPostProcessor(preProcessors: StringReplaceMap[] = []) {
+		function createPostProcessor(
+			preProcessors: StringReplaceMap[] = [],
+			settings: NumeralsSettings = DEFAULT_SETTINGS,
+		) {
 			const app = {
 				vault: {
 					getAbstractFileByPath: jest.fn(() => null),
@@ -190,19 +193,23 @@ describe('inline numerals integration', () => {
 			};
 			return createInlineNumeralsPostProcessor(
 				app as any,
-				() => DEFAULT_SETTINGS,
+				() => settings,
 				() => testFormatter(preProcessors),
 				() => preProcessors,
 				new Map(),
 			);
 		}
 
-		function renderInline(inlineText: string, preProcessors: StringReplaceMap[] = []): HTMLElement {
+		function renderInline(
+			inlineText: string,
+			preProcessors: StringReplaceMap[] = [],
+			settings: NumeralsSettings = DEFAULT_SETTINGS,
+		): HTMLElement {
 			const container = document.createElement('p');
 			const code = document.createElement('code');
 			code.innerText = inlineText;
 			container.appendChild(code);
-			createPostProcessor(preProcessors)(container, { sourcePath: 'source.md', addChild: jest.fn() } as any);
+			createPostProcessor(preProcessors, settings)(container, { sourcePath: 'source.md', addChild: jest.fn() } as any);
 			return code;
 		}
 
@@ -224,6 +231,21 @@ describe('inline numerals integration', () => {
 			expect(code.classList.contains('numerals-inline-tex')).toBe(true);
 			expect(code.querySelector('.numerals-inline-input .numerals-tex')?.textContent).toBe('TeX:\\sqrt{144}');
 			expect(code.querySelector('.numerals-inline-separator')?.textContent).toBe(' = ');
+			expect(code.querySelector('.numerals-inline-value .numerals-tex')?.textContent).toBe('TeX:12');
+			expect(renderMath).toHaveBeenNthCalledWith(1, '\\sqrt{144}', false);
+			expect(renderMath).toHaveBeenNthCalledWith(2, '12', false);
+		});
+
+		it('honors the previous TeX equation syntax when persisted in settings', async () => {
+			const settings = {
+				...DEFAULT_SETTINGS,
+				inlineTexEquationTrigger: '#=$:',
+			};
+			const code = renderInline('#=$: sqrt(144)', [], settings);
+			await Promise.resolve();
+
+			expect(code.classList.contains('numerals-inline-tex')).toBe(true);
+			expect(code.querySelector('.numerals-inline-input .numerals-tex')?.textContent).toBe('TeX:\\sqrt{144}');
 			expect(code.querySelector('.numerals-inline-value .numerals-tex')?.textContent).toBe('TeX:12');
 			expect(renderMath).toHaveBeenNthCalledWith(1, '\\sqrt{144}', false);
 			expect(renderMath).toHaveBeenNthCalledWith(2, '12', false);

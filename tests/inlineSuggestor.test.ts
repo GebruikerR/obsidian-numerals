@@ -233,10 +233,15 @@ describe('findInlineNumeralsContext', () => {
 	// --- Trigger precedence ---
 	describe('trigger precedence', () => {
 		it('should match longer trigger first when one is prefix of another', () => {
-			const line = '`#=: 5*3`';
-			const result = find(line, 7);
+			const line = '`## 5*3`';
+			const result = find(line, 6, {
+				resultTrigger: '##',
+				equationTrigger: '',
+				texResultTrigger: '#',
+				texEquationTrigger: '',
+			});
 			expect(result).not.toBeNull();
-			expect(result!.triggerPrefix).toBe('#=:');
+			expect(result!.triggerPrefix).toBe('##');
 		});
 
 		it('should detect "#$=:" among the four defaults', () => {
