@@ -177,7 +177,7 @@ describe('inline numerals integration', () => {
 	});
 
 	describe('TeX rendering mode', () => {
-		// TeX rendering is chosen per-expression via the `#$:` / `#=$:` triggers,
+		// TeX rendering is chosen per-expression via the `#$:` / `#$=:` triggers,
 		// not a global setting. Uses DEFAULT_SETTINGS trigger prefixes unchanged.
 		function createPostProcessor(preProcessors: StringReplaceMap[] = []) {
 			const app = {
@@ -217,8 +217,8 @@ describe('inline numerals integration', () => {
 			expect(renderMath).toHaveBeenCalledWith('36~\\mathrm{inches}', false);
 		});
 
-		it('renders "#=$:" equation input and result with MathJax in Reading mode', async () => {
-			const code = renderInline('#=$: sqrt(144)');
+		it('renders "#$=:" equation input and result with MathJax in Reading mode', async () => {
+			const code = renderInline('#$=: sqrt(144)');
 			await Promise.resolve();
 
 			expect(code.classList.contains('numerals-inline-tex')).toBe(true);
@@ -254,7 +254,7 @@ describe('inline numerals integration', () => {
 		});
 
 		it('quick-reject still matches when only TeX triggers appear in the document', async () => {
-			const code = renderInline('#=$: 2+3');
+			const code = renderInline('#$=: 2+3');
 			await Promise.resolve();
 
 			expect(code.querySelector('.numerals-inline-value .numerals-tex')?.textContent).toBe('TeX:5');
@@ -290,7 +290,7 @@ describe('inline numerals integration', () => {
 				resultTrigger: '#:',
 				equationTrigger: '#=:',
 				texResultTrigger: '#$:',
-				texEquationTrigger: '#=$:',
+				texEquationTrigger: '#$=:',
 			});
 			expect(parsed).not.toBeNull();
 			expect(() => {

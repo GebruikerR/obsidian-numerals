@@ -64,7 +64,7 @@ const DEFAULT_TRIGGERS: InlineTriggerSettings = {
 	resultTrigger: '#:',
 	equationTrigger: '#=:',
 	texResultTrigger: '#$:',
-	texEquationTrigger: '#=$:',
+	texEquationTrigger: '#$=:',
 };
 
 function parse(text: string, triggers: Partial<InlineTriggerSettings> = {}) {
@@ -121,12 +121,16 @@ describe('parseInlineExpression', () => {
 			expect(result!.expression).toBe('3+2');
 		});
 
-		it('should parse TeX equation trigger "#=$: 3+2"', () => {
-			const result = parse('#=$: 3+2');
+		it('should parse TeX equation trigger "#$=: 3+2"', () => {
+			const result = parse('#$=: 3+2');
 			expect(result).not.toBeNull();
 			expect(result!.mode).toBe(InlineNumeralsMode.Equation);
 			expect(result!.renderStyle).toBe(NumeralsRenderStyle.TeX);
 			expect(result!.expression).toBe('3+2');
+		});
+
+		it('should not treat the previous "#=$:" syntax as a default trigger', () => {
+			expect(parse('#=$: 3+2')).toBeNull();
 		});
 
 		it('should return null for unrecognized text', () => {
@@ -171,8 +175,8 @@ describe('parseInlineExpression', () => {
 			expect(result!.expression).toBe('5*3');
 		});
 
-		it('should check "#=$:" before "#=:", "#$:", and "#:" among the four defaults', () => {
-			const result = parse('#=$: 5*3');
+		it('should distinguish "#$=:" as the TeX equation default', () => {
+			const result = parse('#$=: 5*3');
 			expect(result).not.toBeNull();
 			expect(result!.mode).toBe(InlineNumeralsMode.Equation);
 			expect(result!.renderStyle).toBe(NumeralsRenderStyle.TeX);
@@ -258,6 +262,17 @@ describe('parseInlineExpression', () => {
 			expect(texResult!.renderStyle).toBe(NumeralsRenderStyle.TeX);
 			expect(texResult!.expression).toBe('3+2');
 		});
+
+		it('should preserve the previous syntax when explicitly configured', () => {
+			const result = parse('#=$: 3+2', {
+				...allEmpty,
+				texEquationTrigger: '#=$:',
+			});
+			expect(result).not.toBeNull();
+			expect(result!.mode).toBe(InlineNumeralsMode.Equation);
+			expect(result!.renderStyle).toBe(NumeralsRenderStyle.TeX);
+			expect(result!.expression).toBe('3+2');
+		});
 	});
 
 	// --- Empty trigger safety -----------------------------------------------
@@ -289,7 +304,7 @@ describe('parseInlineExpression', () => {
 			expect(parse('#: 3+2', noTex)!.renderStyle).toBe(NumeralsRenderStyle.Plain);
 			// TeX trigger text no longer matches a trigger
 			expect(parse('#$: 3+2', noTex)).toBeNull();
-			expect(parse('#=$: 3+2', noTex)).toBeNull();
+			expect(parse('#$=: 3+2', noTex)).toBeNull();
 		});
 	});
 });

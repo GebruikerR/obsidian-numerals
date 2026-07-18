@@ -563,11 +563,11 @@ export class NumeralsSettingTab extends PluginSettingTab {
 			.setName('TeX equation trigger') // eslint-disable-line obsidianmd/ui/sentence-case
 			.setDesc(htmlToElements(
 				`Prefix for inline code that renders the expression and result with TeX (MathJax).<br>`
-				+ `Example: <code>#=$: sqrt(2)/2</code> renders as typeset math like <b>√2⁄2 = 0.7071</b><br>`
+				+ `Example: <code>#$=: sqrt(2)/2</code> renders as typeset math like <b>√2⁄2 = 0.7071</b><br>`
 				+ `Must differ from the other trigger prefixes.`
 			))
 			.addText(text => text
-				.setPlaceholder('#=$:')
+				.setPlaceholder('#$=:')
 				.setValue(this.plugin.settings.inlineTexEquationTrigger)
 				.onChange(async (value) => {
 					this.plugin.settings.inlineTexEquationTrigger = value;

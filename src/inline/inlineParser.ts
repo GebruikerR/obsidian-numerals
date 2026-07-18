@@ -47,8 +47,8 @@ export function getActiveInlineTriggers(settings: NumeralsSettings): string[] {
  * Checks whether the text starts with a recognized trigger prefix. Each
  * trigger maps to a rendering mode (result-only or equation) and a render
  * style (plain text or TeX). Triggers are checked longest-first so that a
- * longer trigger that has a shorter trigger as a prefix wins (e.g. "#=$:"
- * before "#=:", "#$:", and "#:").
+ * longer trigger that has a shorter trigger as a prefix wins (e.g. "#=:"
+ * before "#:").
  *
  * Empty triggers are silently ignored to prevent matching all code spans.
  *
@@ -67,7 +67,7 @@ export function parseInlineExpression(
 	if (triggers.texResultTrigger) candidates.push([triggers.texResultTrigger, InlineNumeralsMode.ResultOnly, NumeralsRenderStyle.TeX]);
 	if (triggers.texEquationTrigger) candidates.push([triggers.texEquationTrigger, InlineNumeralsMode.Equation, NumeralsRenderStyle.TeX]);
 
-	// Sort longest-first to avoid prefix conflicts ("#=$:" before "#=:")
+	// Sort longest-first to avoid prefix conflicts ("#=:" before "#:")
 	candidates.sort((a, b) => b[0].length - a[0].length);
 
 	for (const [trigger, mode, renderStyle] of candidates) {
