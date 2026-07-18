@@ -54,7 +54,7 @@ class DefaultResultFormatter implements ResultFormatter {
 		this.preProcessors = [...(config.preProcessors ?? [])];
 		this.currencies = config.currencies;
 		this.currencyPrecisionMode = config.currencyPrecisionMode ??
-			CurrencyPrecisionMode.FollowNumberFormat;
+			CurrencyPrecisionMode.CurrencyStandard;
 		this.currencyDisplayMode = config.currencyDisplayMode ??
 			CurrencyDisplayMode.Code;
 	}

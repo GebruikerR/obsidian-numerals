@@ -208,7 +208,7 @@ describe('ResultFormatter currency presentation', () => {
 		});
 	}
 
-	it('preserves legacy output under the compatibility policies', () => {
+	it('supports rendered-number precision as an explicit compatibility policy', () => {
 		const profile = createNumberFormatProfile(
 			NumeralsNumberFormat.System,
 			'en-US'
@@ -216,6 +216,7 @@ describe('ResultFormatter currency presentation', () => {
 		const formatter = createResultFormatter({
 			profile,
 			currencies: registry(),
+			currencyPrecisionMode: CurrencyPrecisionMode.FollowNumberFormat,
 		});
 		const value = math.unit(1234.5, 'GBP');
 
@@ -226,7 +227,7 @@ describe('ResultFormatter currency presentation', () => {
 		expect(formatted.canonical).toBe(formatted.text);
 	});
 
-	it('normalizes a pure currency alias to its code in canonical output', () => {
+	it('normalizes a pure currency alias under the default currency policy', () => {
 		const profile = createNumberFormatProfile(
 			NumeralsNumberFormat.System,
 			'en-US'
@@ -237,8 +238,8 @@ describe('ResultFormatter currency presentation', () => {
 		});
 		const formatted = formatter.format(math.unit(12, 'gbp'));
 
-		expect(formatted.text).toBe('12 gbp');
-		expect(formatted.canonical).toBe('12 GBP');
+		expect(formatted.text).toBe('12.00 GBP');
+		expect(formatted.canonical).toBe('12.00 GBP');
 	});
 
 	it('uses standard currency digits with code-suffix text and canonical output', () => {

@@ -111,7 +111,7 @@ export const DEFAULT_SETTINGS: NumeralsSettings = {
 	provideSuggestions: 				true,
 	suggestionsIncludeMathjsSymbols: 	false,
 	numberFormat: 						NumeralsNumberFormat.System,
-	currencyPrecisionMode: 			CurrencyPrecisionMode.FollowNumberFormat,
+	currencyPrecisionMode: 			CurrencyPrecisionMode.CurrencyStandard,
 	currencyDisplayMode: 			CurrencyDisplayMode.Code,
 	customCurrencyDecimalPlaces: 	2,
 	forceProcessAllFrontmatter: 		false,
@@ -132,7 +132,7 @@ export const DEFAULT_SETTINGS: NumeralsSettings = {
 /**
  * Repair invalid persisted currency-formatting settings in place.
  * Missing properties are left untouched so older settings files can inherit
- * compatibility defaults without being rewritten merely by loading Numerals.
+ * current defaults without being rewritten merely by loading Numerals.
  *
  * @returns Whether any present property was repaired.
  */

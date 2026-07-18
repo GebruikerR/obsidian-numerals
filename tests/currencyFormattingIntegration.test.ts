@@ -33,7 +33,6 @@ import {
 	type ResultFormatter,
 } from '../src/formatting';
 import { PlainRenderer, TeXRenderer } from '../src/renderers';
-import { resultToTeX } from '../src/rendering/texRendering';
 
 const activeCurrencies: CurrencyType[] = [
 	{ symbol: '$', unicode: 'x024', name: 'dollar', currency: 'USD' },
@@ -132,12 +131,7 @@ beforeAll(() => {
 });
 
 describe('currency formatting compatibility matrix', () => {
-	it.each([
-		['GBP', 120],
-		['USD', 120.1],
-		['JPY', 120.5],
-		['KWD', 120.1234],
-	])('keeps default settings byte-compatible for %s', (code, amount) => {
+	it('uses currency-standard precision and code display by default', () => {
 		const profile = createNumberFormatProfile(
 			NumeralsNumberFormat.System,
 			'en-US',
@@ -147,21 +141,16 @@ describe('currency formatting compatibility matrix', () => {
 			currencies: CurrencyRegistry.create(activeCurrencies, {
 				locale: 'en-US',
 			}),
-			currencyPrecisionMode: DEFAULT_SETTINGS.currencyPrecisionMode,
-			currencyDisplayMode: DEFAULT_SETTINGS.currencyDisplayMode,
 		});
-		const value = currency(amount, code);
-		const formatted = formatter.format(value);
-		const legacyText = math.format(value, profile.mathjsFormat);
 
 		expect(DEFAULT_SETTINGS.currencyPrecisionMode).toBe(
-			CurrencyPrecisionMode.FollowNumberFormat,
+			CurrencyPrecisionMode.CurrencyStandard,
 		);
 		expect(DEFAULT_SETTINGS.currencyDisplayMode).toBe(CurrencyDisplayMode.Code);
-		expect(formatted).toEqual({
-			text: legacyText,
-			tex: resultToTeX(value, []),
-			canonical: legacyText,
+		expect(formatter.format(currency(120, 'GBP'))).toEqual({
+			text: '120.00 GBP',
+			tex: '120.00~\\mathrm{GBP}',
+			canonical: '120.00 GBP',
 		});
 	});
 

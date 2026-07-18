@@ -8,9 +8,9 @@ import {
 } from '../src/numerals.types';
 
 describe('currency formatting settings', () => {
-	it('uses compatibility-safe defaults', () => {
+	it('uses currency-standard precision and code display by default', () => {
 		expect(DEFAULT_SETTINGS.currencyPrecisionMode).toBe(
-			CurrencyPrecisionMode.FollowNumberFormat
+			CurrencyPrecisionMode.CurrencyStandard
 		);
 		expect(DEFAULT_SETTINGS.currencyDisplayMode).toBe(CurrencyDisplayMode.Code);
 		expect(DEFAULT_SETTINGS.customCurrencyDecimalPlaces).toBe(2);
@@ -21,6 +21,9 @@ describe('currency formatting settings', () => {
 
 		expect(normalizeCurrencyFormattingSettings(data)).toBe(false);
 		expect(data).toEqual({ numberFormat: 'System' });
+		expect({ ...DEFAULT_SETTINGS, ...data }.currencyPrecisionMode).toBe(
+			CurrencyPrecisionMode.CurrencyStandard
+		);
 	});
 
 	it('leaves valid persisted settings unchanged', () => {
@@ -68,7 +71,7 @@ describe('currency formatting settings', () => {
 
 		expect(normalizeCurrencyFormattingSettings(data)).toBe(true);
 		expect(data).toEqual({
-			currencyPrecisionMode: CurrencyPrecisionMode.FollowNumberFormat,
+			currencyPrecisionMode: CurrencyPrecisionMode.CurrencyStandard,
 			currencyDisplayMode: CurrencyDisplayMode.Code,
 			customCurrencyDecimalPlaces: 4,
 			unrelated: true,

@@ -271,15 +271,17 @@ These directives change displayed and inserted results, not values in calculatio
 
 ### Currency Formatting
 
-Currency formatting is opt-in so existing notes keep their current output. The compatibility defaults are **Use rendered number format** and **Currency code**, which preserve results such as `120 GBP`.
+Currency results use **Currency standard** precision and **Currency code** display by default. Pure currency values therefore render with the conventional number of decimal places for their currency while keeping an unambiguous unit code.
 
-To use conventional currency precision, choose **Use currency standard** in Numerals settings. Pure currency results then use the standard number of decimal places for their currency:
+Examples of the default precision are:
 
 - GBP and USD use 2 places: `120.00 GBP`
 - JPY uses 0 places: `120 JPY`
 - KWD uses 3 places: `120.000 KWD`
 
 A custom currency mapping uses the configured **Custom currency decimal places** value, from 0 through 20. This setting is enabled when currency-standard precision is selected.
+
+Choose **Use rendered number format** when currency values should instead follow the general number-format behavior used by other Units.
 
 Choose **Configured symbol** to display the symbol from Numerals' active currency mapping instead of its code. Symbol order, spacing, digits, and signs follow the selected locale, while the configured symbol itself is preserved. For example, a `$` mapping to CAD still uses `$`, rather than substituting `CA$`.
 

@@ -363,7 +363,7 @@ export default class NumeralsPlugin extends Plugin {
 			currencies: this.currencyRegistry,
 			preProcessors: this.preProcessors,
 			currencyPrecisionMode: this.settings.currencyPrecisionMode ??
-				CurrencyPrecisionMode.FollowNumberFormat,
+				CurrencyPrecisionMode.CurrencyStandard,
 			currencyDisplayMode: this.settings.currencyDisplayMode ??
 				CurrencyDisplayMode.Code,
 		});
