@@ -56,11 +56,11 @@ Inline Numerals expressions are ordinary inline code with a trigger prefix:
 | `` `#: 3ft * 4ft` `` | `12 ft^2` | Showing just the answer |
 | `` `#=: 3ft * 4ft` `` | `3 ft * 4 ft = 12 ft^2` | Showing the expression and answer |
 | `` `#$: 3ft * 4ft` `` | 12 ft² typeset with MathJax | A TeX-rendered answer |
-| `` `#=$: 3ft * 4ft` `` | 3 ft · 4 ft = 12 ft² typeset with MathJax | A TeX-rendered equation |
+| `` `#$=: 3ft * 4ft` `` | 3 ft · 4 ft = 12 ft² typeset with MathJax | A TeX-rendered equation |
 
 Inline calculations work in Live Preview and Reading mode. They support the same math engine, number formatting, units, currency symbols, variables, frontmatter, and Dataview values as math blocks.
 
-The `#$:` and `#=$:` triggers render the result (and, in equation mode, the expression) as TeX-style MathJax, inline with surrounding text in both Live Preview and Reading mode. All four trigger prefixes are configurable in the Numerals settings.
+The `#$:` and `#$=:` triggers render the result (and, in equation mode, the expression) as TeX-style MathJax, inline with surrounding text in both Live Preview and Reading mode. All four trigger prefixes are configurable in the Numerals settings.
 
 ### Math Blocks
 

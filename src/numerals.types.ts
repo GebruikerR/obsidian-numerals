@@ -122,7 +122,7 @@ export const DEFAULT_SETTINGS: NumeralsSettings = {
 	inlineResultTrigger:				"#:",
 	inlineEquationTrigger:				"#=:",
 	inlineTexResultTrigger:				"#$:",
-	inlineTexEquationTrigger:			"#=$:",
+	inlineTexEquationTrigger:			"#$=:",
 	inlineEquationSeparator:				" = ",
 	provideInlineSuggestions:			true,
 	// Cross-note reference settings

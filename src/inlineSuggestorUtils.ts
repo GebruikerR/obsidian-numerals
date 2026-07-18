@@ -63,7 +63,7 @@ export function findInlineNumeralsContext(
 	const segments = findInlineCodeSegments(line);
 
 	// Build trigger candidates, filtering out empty triggers.
-	// Sort longest-first to handle prefix conflicts (e.g. '#=$:' before '#=:').
+	// Sort longest-first to handle configurable prefix conflicts (e.g. '##' before '#').
 	const triggers = listInlineTriggers(triggerSettings).filter(t => t.length > 0);
 	triggers.sort((a, b) => b.length - a.length);
 

@@ -16,7 +16,7 @@ const DEFAULT_TRIGGERS: InlineTriggerSettings = {
 	resultTrigger: '#:',
 	equationTrigger: '#=:',
 	texResultTrigger: '#$:',
-	texEquationTrigger: '#=$:',
+	texEquationTrigger: '#$=:',
 };
 
 function find(line: string, cursorCh: number, triggers: Partial<InlineTriggerSettings> = {}) {
@@ -184,11 +184,11 @@ describe('findInlineNumeralsContext', () => {
 		});
 
 		it('should detect cursor inside a TeX equation span', () => {
-			// `(0)#(1)=(2)$(3):(4) (5)x(6)`(7)
-			const line = '`#=$: x`';
+			// `(0)#(1)$(2)=(3):(4) (5)x(6)`(7)
+			const line = '`#$=: x`';
 			const result = find(line, 6); // cursor at 'x'
 			expect(result).not.toBeNull();
-			expect(result!.triggerPrefix).toBe('#=$:');
+			expect(result!.triggerPrefix).toBe('#$=:');
 			expect(result!.expressionStartCh).toBe(5);
 		});
 	});
@@ -220,22 +220,35 @@ describe('findInlineNumeralsContext', () => {
 			const line = '`anything`';
 			expect(find(line, 5, allEmpty)).toBeNull();
 		});
+
+		it('should preserve the previous syntax when explicitly configured', () => {
+			const line = '`#=$: x`';
+			const result = find(line, 6, { ...allEmpty, texEquationTrigger: '#=$:' });
+			expect(result).not.toBeNull();
+			expect(result!.triggerPrefix).toBe('#=$:');
+			expect(result!.expressionStartCh).toBe(5);
+		});
 	});
 
 	// --- Trigger precedence ---
 	describe('trigger precedence', () => {
 		it('should match longer trigger first when one is prefix of another', () => {
-			const line = '`#=: 5*3`';
-			const result = find(line, 7);
+			const line = '`## 5*3`';
+			const result = find(line, 6, {
+				resultTrigger: '##',
+				equationTrigger: '',
+				texResultTrigger: '#',
+				texEquationTrigger: '',
+			});
 			expect(result).not.toBeNull();
-			expect(result!.triggerPrefix).toBe('#=:');
+			expect(result!.triggerPrefix).toBe('##');
 		});
 
-		it('should match "#=$:" over "#=:", "#$:", and "#:" among the four defaults', () => {
-			const line = '`#=$: 5*3`';
+		it('should detect "#$=:" among the four defaults', () => {
+			const line = '`#$=: 5*3`';
 			const result = find(line, 7);
 			expect(result).not.toBeNull();
-			expect(result!.triggerPrefix).toBe('#=$:');
+			expect(result!.triggerPrefix).toBe('#$=:');
 		});
 	});
 });
