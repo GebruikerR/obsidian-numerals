@@ -92,7 +92,7 @@ y = x * 3
 - Directive names and values are case-insensitive.
 - Leading and trailing whitespace are allowed.
 - The last valid directive of each kind wins.
-- A valid directive is replaced by an empty source line so evaluation and source line indexes stay aligned.
+- A valid directive is replaced by an empty source line and marked evaluation-transparent, so source indexes stay aligned without changing `@prev` or `@total` semantics.
 - An invalid directive stops block evaluation and produces a dedicated formatting-directive error that identifies the source line.
 - Formatting directives are block-scoped. Inline Numerals use global settings.
 

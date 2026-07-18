@@ -98,6 +98,7 @@ describe('renderNumeralsBlock', () => {
 		processedBlock = {
 			rawRows: ['1 + 1', '2 + 2', '3 + 3'],
 			processedSource: '1 + 1\n2 + 2\n3 + 3',
+			transparentLineIndexes: [],
 			blockInfo,
 			formatOverrides: {},
 			invalidFormatDirectives: [],

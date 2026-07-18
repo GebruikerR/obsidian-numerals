@@ -21,7 +21,8 @@ import { NumeralsScope, NumeralsError } from '../numerals.types';
  */
 export function evaluateMathFromSourceStrings(
 	processedSource: string,
-	scope: NumeralsScope
+	scope: NumeralsScope,
+	transparentLineIndexes: readonly number[] = []
 ): {
 	results: unknown[];
 	inputs: string[];
@@ -34,18 +35,27 @@ export function evaluateMathFromSourceStrings(
 	const rows: string[] = processedSource.split("\n");
 	const results: unknown[] = [];
 	const inputs: string[] = [];
+	const transparentLines = new Set(transparentLineIndexes);
+	const segmentResults: unknown[] = [];
+	let hasPreviousEvaluation = false;
+	let previousResult: unknown;
 
 	// Last row is empty in reader view, so ignore it if empty
 	const isLastRowEmpty = rows.slice(-1)[0] === "";
 	const rowsToProcess = isLastRowEmpty ? rows.slice(0, -1) : rows;
 
 	for (const [index, row] of rowsToProcess.entries()) {
-		const lastUndefinedRowIndex = results.slice(0, index).lastIndexOf(undefined);
+		if (transparentLines.has(index)) {
+			// Preserve source/result index alignment without allowing a display-only
+			// directive row to change @prev or reset the current @total segment.
+			results.push(undefined);
+			inputs.push(row);
+			continue;
+		}
 
 		try {
-			if (index > 0 && results.length > 0) {
-				const prevResult = results[results.length - 1];
-				scope.set("__prev", prevResult);
+			if (hasPreviousEvaluation) {
+				scope.set("__prev", previousResult);
 			} else {
 				scope.set("__prev", undefined);
 				if (/__prev/i.test(row)) {
@@ -55,11 +65,10 @@ export function evaluateMathFromSourceStrings(
 				}
 			}
 			
-			const partialResults = results.slice(lastUndefinedRowIndex+1, index).filter(result => result !== undefined);
-			if (partialResults.length > 1) {
+			if (segmentResults.length > 1) {
 				try {
 					// eslint-disable-next-line prefer-spread
-					const rollingSum = math.add.apply(math, partialResults as [math.MathType, math.MathType, ...math.MathType[]]);
+					const rollingSum = math.add.apply(math, segmentResults as [math.MathType, math.MathType, ...math.MathType[]]);
 					scope.set("__total", rollingSum);
 				} catch {
 					scope.set("__total", undefined);
@@ -71,13 +80,22 @@ export function evaluateMathFromSourceStrings(
 					}						
 				}
 
-			} else if (partialResults.length === 1) {
-				scope.set("__total", partialResults[0]);
+			} else if (segmentResults.length === 1) {
+				scope.set("__total", segmentResults[0]);
 			} else {
 				scope.set("__total", undefined);
 			}
-			results.push(math.evaluate(row, scope));
+
+			const result = math.evaluate(row, scope) as unknown;
+			results.push(result);
 			inputs.push(row); // Only pushes if evaluate is successful
+			hasPreviousEvaluation = true;
+			previousResult = result;
+			if (result === undefined) {
+				segmentResults.length = 0;
+			} else {
+				segmentResults.push(result);
+			}
 		} catch (error: unknown) {
 			errorMsg = error instanceof Error ? error : new Error(String(error));
 			errorInput = row;
