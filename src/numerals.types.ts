@@ -70,7 +70,8 @@ interface CurrencySymbolMapping {
 
 export type UnitPreferenceDimensionMap = Record<string, string[]>;
 
-export const DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION: Readonly<UnitPreferenceDimensionMap> = Object.freeze({
+export const DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION:
+	Readonly<Record<string, readonly string[]>> = Object.freeze({
 	mass: Object.freeze(['t', 'kg', 'g', 'mg']),
 	length: Object.freeze(['m', 'km', 'mm', 'cm']),
 	force: Object.freeze(['kN', 'N']),

@@ -588,107 +588,6 @@ function numberStringToTeX(value: string): string {
 		return value;
 	}
 
-	function toBlockedUnitSet(units: readonly string[] | undefined): Set<string> {
-		if (!units) {
-			return new Set<string>();
-		}
-		return new Set(units.map((unit) => unit.toLowerCase()));
-	}
-
-	function extractExplicitUnitTokens(sourceExpression: string | undefined): string[] {
-		if (!sourceExpression) {
-			return [];
-		}
-		const matches = sourceExpression.match(/\b[A-Za-zµ°][A-Za-z0-9µ°]*\b/gu);
-		if (!matches) {
-			return [];
-		}
-
-		const tokens: string[] = [];
-		const seen = new Set<string>();
-		for (const token of matches) {
-			const normalized = token.trim();
-			if (normalized.length === 0) {
-				continue;
-			}
-			const key = normalized.toLowerCase();
-			if (seen.has(key)) {
-				continue;
-			}
-			seen.add(key);
-			tokens.push(normalized);
-		}
-		return tokens;
-	}
-
-	function findCompatibleDimension(
-		value: math.Unit,
-		preferred: UnitPreferenceDimensionMap,
-		custom: UnitPreferenceDimensionMap
-	): string | undefined {
-		const dimensionOrder = new Set<string>([
-			...Object.keys(DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION),
-			...Object.keys(preferred),
-			...Object.keys(custom),
-		]);
-		for (const dimension of dimensionOrder) {
-			const candidates = buildDimensionCandidates(
-				dimension,
-				preferred,
-				custom,
-				new Set()
-			);
-			if (candidates.some((candidate) => canConvertUnit(value, candidate))) {
-				return dimension;
-			}
-		}
-		return undefined;
-	}
-
-	function buildDimensionCandidates(
-		dimension: string,
-		preferred: UnitPreferenceDimensionMap,
-		custom: UnitPreferenceDimensionMap,
-		blockedUnits: ReadonlySet<string>
-	): string[] {
-		const candidates = [
-			...(preferred[dimension] ?? []),
-			...(custom[dimension] ?? []),
-		];
-		const seen = new Set<string>();
-		const output: string[] = [];
-		for (const candidate of candidates) {
-			const trimmed = candidate.trim();
-			if (trimmed.length === 0) {
-				continue;
-			}
-			const key = trimmed.toLowerCase();
-			if (seen.has(key) || blockedUnits.has(key)) {
-				continue;
-			}
-			seen.add(key);
-			output.push(trimmed);
-		}
-		return output;
-	}
-
-	function canConvertUnit(value: math.Unit, targetUnit: string): boolean {
-		try {
-			value.to(targetUnit);
-			return true;
-		} catch {
-			return false;
-		}
-	}
-
-	function tryConvertUnit(value: math.Unit, targetUnit: string): math.Unit | undefined {
-		try {
-			return value.to(targetUnit);
-		} catch {
-			return undefined;
-		}
-	}
-
 	return `${exponential[1]} \\times 10^{${Number(exponential[2])}}`;
 }
 
@@ -698,4 +597,105 @@ function escapeTexText(value: string): string {
 		.replace(/([{}#$%&_])/gu, '\\$1')
 		.replace(/\^/gu, '\\textasciicircum{}')
 		.replace(/~/gu, '\\textasciitilde{}');
+}
+
+function toBlockedUnitSet(units: readonly string[] | undefined): Set<string> {
+	if (!units) {
+		return new Set<string>();
+	}
+	return new Set(units.map((unit) => unit.toLowerCase()));
+}
+
+function extractExplicitUnitTokens(sourceExpression: string | undefined): string[] {
+	if (!sourceExpression) {
+		return [];
+	}
+	const matches = sourceExpression.match(/\b[A-Za-zµ°][A-Za-z0-9µ°]*\b/gu);
+	if (!matches) {
+		return [];
+	}
+
+	const tokens: string[] = [];
+	const seen = new Set<string>();
+	for (const token of matches) {
+		const normalized = token.trim();
+		if (normalized.length === 0) {
+			continue;
+		}
+		const key = normalized.toLowerCase();
+		if (seen.has(key)) {
+			continue;
+		}
+		seen.add(key);
+		tokens.push(normalized);
+	}
+	return tokens;
+}
+
+function findCompatibleDimension(
+	value: math.Unit,
+	preferred: UnitPreferenceDimensionMap,
+	custom: UnitPreferenceDimensionMap
+): string | undefined {
+	const dimensionOrder = new Set<string>([
+		...Object.keys(DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION),
+		...Object.keys(preferred),
+		...Object.keys(custom),
+	]);
+	for (const dimension of dimensionOrder) {
+		const candidates = buildDimensionCandidates(
+			dimension,
+			preferred,
+			custom,
+			new Set()
+		);
+		if (candidates.some((candidate) => canConvertUnit(value, candidate))) {
+			return dimension;
+		}
+	}
+	return undefined;
+}
+
+function buildDimensionCandidates(
+	dimension: string,
+	preferred: UnitPreferenceDimensionMap,
+	custom: UnitPreferenceDimensionMap,
+	blockedUnits: ReadonlySet<string>
+): string[] {
+	const candidates = [
+		...(preferred[dimension] ?? []),
+		...(custom[dimension] ?? []),
+	];
+	const seen = new Set<string>();
+	const output: string[] = [];
+	for (const candidate of candidates) {
+		const trimmed = candidate.trim();
+		if (trimmed.length === 0) {
+			continue;
+		}
+		const key = trimmed.toLowerCase();
+		if (seen.has(key) || blockedUnits.has(key)) {
+			continue;
+		}
+		seen.add(key);
+		output.push(trimmed);
+	}
+	return output;
+}
+
+function canConvertUnit(value: math.Unit, targetUnit: string): boolean {
+	try {
+		value.to(targetUnit);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+function tryConvertUnit(value: math.Unit, targetUnit: string): math.Unit | undefined {
+	try {
+		return value.to(targetUnit);
+	} catch {
+		return undefined;
+	}
 }

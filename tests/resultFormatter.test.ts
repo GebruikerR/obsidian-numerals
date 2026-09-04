@@ -192,12 +192,15 @@ describe('ResultFormatter', () => {
 		function unitDisplayPreferences(
 			override: Partial<UnitDisplayPreferencesSettings> = {}
 		): UnitDisplayPreferencesSettings {
+			const defaultPreferred: Record<string, string[]> = {};
+			for (const [dimension, units] of Object.entries(DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION)) {
+				defaultPreferred[dimension] = [...units];
+			}
+
 			return {
 				enableCustomDisplayUnitPreferences: true,
 				preserveExplicitInputUnits: true,
-				preferredDisplayUnitsByDimension: {
-					...DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION,
-				},
+				preferredDisplayUnitsByDimension: defaultPreferred,
 				blockedDisplayUnits: [],
 				customDisplayUnitsByDimension: {},
 				...override,
@@ -238,9 +241,13 @@ describe('ResultFormatter', () => {
 			const formatter = createResultFormatter({
 				profile: createNumberFormatProfile(NumeralsNumberFormat.Fixed, 'en-US'),
 				unitDisplayPreferences: unitDisplayPreferences({
+					preserveExplicitInputUnits: false,
 					blockedDisplayUnits: ['kg'],
 					preferredDisplayUnitsByDimension: {
-						...DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION,
+						...Object.fromEntries(
+							Object.entries(DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION)
+								.map(([dimension, units]) => [dimension, [...units]])
+						),
 						mass: ['mg', 'g', 'kg'],
 					},
 				}),
@@ -260,7 +267,10 @@ describe('ResultFormatter', () => {
 				profile,
 				unitDisplayPreferences: unitDisplayPreferences({
 					preferredDisplayUnitsByDimension: {
-						...DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION,
+						...Object.fromEntries(
+							Object.entries(DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION)
+								.map(([dimension, units]) => [dimension, [...units]])
+						),
 						mass: [],
 					},
 				}),
