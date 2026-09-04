@@ -610,26 +610,13 @@ function extractExplicitUnitTokens(sourceExpression: string | undefined): string
 	if (!sourceExpression) {
 		return [];
 	}
-	const matches = sourceExpression.match(/\b[A-Za-zµ°][A-Za-z0-9µ°]*\b/gu);
-	if (!matches) {
-		return [];
-	}
-
-	const tokens: string[] = [];
-	const seen = new Set<string>();
-	for (const token of matches) {
-		const normalized = token.trim();
-		if (normalized.length === 0) {
-			continue;
-		}
-		const key = normalized.toLowerCase();
-		if (seen.has(key)) {
-			continue;
-		}
-		seen.add(key);
-		tokens.push(normalized);
-	}
-	return tokens;
+	const numericUnitPattern = /(?:^|[^\w])(?:\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*([A-Za-zµ°][A-Za-z0-9µ°]*)\b/gu;
+	const conversionTargetPattern = /\b(?:to|in)\s+([A-Za-zµ°][A-Za-z0-9µ°]*)\b/giu;
+	return collectOrderedUnitMatches(
+		sourceExpression,
+		numericUnitPattern,
+		conversionTargetPattern
+	);
 }
 
 function findCompatibleDimension(
@@ -698,4 +685,34 @@ function tryConvertUnit(value: math.Unit, targetUnit: string): math.Unit | undef
 	} catch {
 		return undefined;
 	}
+}
+
+function collectOrderedUnitMatches(
+	sourceExpression: string,
+	...patterns: RegExp[]
+): string[] {
+	const orderedMatches: { index: number; unit: string }[] = [];
+	for (const pattern of patterns) {
+		for (const match of sourceExpression.matchAll(pattern)) {
+			const unit = match[1]?.trim();
+			const index = match.index ?? 0;
+			if (!unit) {
+				continue;
+			}
+			orderedMatches.push({ index, unit });
+		}
+	}
+	orderedMatches.sort((left, right) => left.index - right.index);
+
+	const seen = new Set<string>();
+	const units: string[] = [];
+	for (const match of orderedMatches) {
+		const dedupeKey = match.unit.toLowerCase();
+		if (seen.has(dedupeKey)) {
+			continue;
+		}
+		seen.add(dedupeKey);
+		units.push(match.unit);
+	}
+	return units;
 }

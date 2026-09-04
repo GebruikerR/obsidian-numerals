@@ -140,7 +140,7 @@ export const DEFAULT_SETTINGS: NumeralsSettings = {
 	customCurrencyDecimalPlaces: 	2,
 	enableCustomDisplayUnitPreferences:	false,
 	preserveExplicitInputUnits:			true,
-	preferredDisplayUnitsByDimension:	cloneDimensionMap(DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION),
+	preferredDisplayUnitsByDimension:	cloneUnitPreferenceDimensionMap(DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION),
 	blockedDisplayUnits:				[],
 	customDisplayUnitsByDimension:		{},
 	forceProcessAllFrontmatter: 		false,
@@ -242,11 +242,11 @@ export function normalizeUnitDisplayPreferencesSettings(
 	if (hasOwn('preferredDisplayUnitsByDimension')) {
 		const normalized = normalizeDimensionMap(
 			data['preferredDisplayUnitsByDimension'],
-			cloneDimensionMap(DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION)
+			cloneUnitPreferenceDimensionMap(DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION)
 		);
 		if (normalized === undefined) {
 			data['preferredDisplayUnitsByDimension'] =
-				cloneDimensionMap(DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION);
+				cloneUnitPreferenceDimensionMap(DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION);
 			changed = true;
 		} else if (!areDimensionMapsEqual(data['preferredDisplayUnitsByDimension'], normalized)) {
 			data['preferredDisplayUnitsByDimension'] = normalized;
@@ -279,7 +279,7 @@ export interface CurrencyType {
 	currency: string;
 }
 
-function cloneDimensionMap(
+export function cloneUnitPreferenceDimensionMap(
 	map: Readonly<Record<string, readonly string[]>>
 ): UnitPreferenceDimensionMap {
 	const clone: UnitPreferenceDimensionMap = {};
@@ -328,7 +328,7 @@ function normalizeDimensionMap(
 		return undefined;
 	}
 
-	const normalized = cloneDimensionMap(fallback);
+	const normalized = cloneUnitPreferenceDimensionMap(fallback);
 	for (const [rawDimension, rawUnits] of Object.entries(value)) {
 		const dimension = rawDimension.trim();
 		if (dimension.length === 0) {

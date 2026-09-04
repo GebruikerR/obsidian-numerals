@@ -23,6 +23,7 @@ import {
 	normalizeCurrencyFormattingSettings,
 	normalizeUnitDisplayPreferencesSettings,
 	DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION,
+	cloneUnitPreferenceDimensionMap,
 } from "./numerals.types";
 import {
 	NumeralsSettingTab,
@@ -344,10 +345,10 @@ export default class NumeralsPlugin extends Plugin {
 
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, loadData);
 		this.settings.preferredDisplayUnitsByDimension = {
-			...cloneDimensionMap(DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION),
+			...cloneUnitPreferenceDimensionMap(DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION),
 			...(loadData?.preferredDisplayUnitsByDimension ?? {}),
 		};
-		this.settings.customDisplayUnitsByDimension = cloneDimensionMap(
+		this.settings.customDisplayUnitsByDimension = cloneUnitPreferenceDimensionMap(
 			loadData?.customDisplayUnitsByDimension ?? {}
 		);
 		this.settings.blockedDisplayUnits = [...(loadData?.blockedDisplayUnits ?? [])];
@@ -384,24 +385,14 @@ export default class NumeralsPlugin extends Plugin {
 				enableCustomDisplayUnitPreferences:
 					this.settings.enableCustomDisplayUnitPreferences,
 				preserveExplicitInputUnits: this.settings.preserveExplicitInputUnits,
-				preferredDisplayUnitsByDimension: cloneDimensionMap(
+				preferredDisplayUnitsByDimension: cloneUnitPreferenceDimensionMap(
 					this.settings.preferredDisplayUnitsByDimension
 				),
 				blockedDisplayUnits: [...this.settings.blockedDisplayUnits],
-				customDisplayUnitsByDimension: cloneDimensionMap(
+				customDisplayUnitsByDimension: cloneUnitPreferenceDimensionMap(
 					this.settings.customDisplayUnitsByDimension
 				),
 			},
 		});
 	}
-}
-
-function cloneDimensionMap(
-	map: Readonly<Record<string, readonly string[]>>
-): Record<string, string[]> {
-	const clone: Record<string, string[]> = {};
-	for (const [dimension, units] of Object.entries(map)) {
-		clone[dimension] = [...units];
-	}
-	return clone;
 }
