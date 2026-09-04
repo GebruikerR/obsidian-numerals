@@ -12,6 +12,11 @@ export interface ResultFormatOverrides {
 	decimalPlaces?: number;
 }
 
+export interface ResultFormatContext {
+	/** Source expression being rendered, used for display-only unit choices. */
+	sourceExpression?: string;
+}
+
 /**
  * A normalized number-format selection.
  *
@@ -46,7 +51,11 @@ export interface FormattedResult {
 
 /** The single formatting boundary used by every result-rendering surface. */
 export interface ResultFormatter {
-	format(value: unknown, overrides?: ResultFormatOverrides): FormattedResult;
+	format(
+		value: unknown,
+		overrides?: ResultFormatOverrides,
+		context?: ResultFormatContext
+	): FormattedResult;
 }
 
 /** Immutable metadata for one active currency unit. */

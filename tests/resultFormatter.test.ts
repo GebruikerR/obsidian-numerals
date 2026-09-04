@@ -8,7 +8,9 @@ import * as math from 'mathjs';
 import {
 	CurrencyDisplayMode,
 	CurrencyPrecisionMode,
+	DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION,
 	NumeralsNumberFormat,
+	type UnitDisplayPreferencesSettings,
 } from '../src/numerals.types';
 import {
 	createNumberFormatProfile,
@@ -184,6 +186,89 @@ describe('ResultFormatter', () => {
 		expect(formatted.tex).toContain('2.00');
 		expect(formatted.tex).toContain('3.00');
 		expect(formatted.tex).toContain('4.00');
+	});
+
+	describe('unit display preferences', () => {
+		function unitDisplayPreferences(
+			override: Partial<UnitDisplayPreferencesSettings> = {}
+		): UnitDisplayPreferencesSettings {
+			return {
+				enableCustomDisplayUnitPreferences: true,
+				preserveExplicitInputUnits: true,
+				preferredDisplayUnitsByDimension: {
+					...DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION,
+				},
+				blockedDisplayUnits: [],
+				customDisplayUnitsByDimension: {},
+				...override,
+			};
+		}
+
+		it('falls back to mathjs formatting when custom preferences are disabled', () => {
+			const profile = createNumberFormatProfile(
+				NumeralsNumberFormat.Fixed,
+				'en-US'
+			);
+			const formatter = createResultFormatter({
+				profile,
+				unitDisplayPreferences: unitDisplayPreferences({
+					enableCustomDisplayUnitPreferences: false,
+				}),
+			});
+			const value = math.unit(2000, 'g');
+
+			expect(formatter.format(value).text).toBe(math.format(value, profile.mathjsFormat));
+		});
+
+		it('preserves explicit input units when enabled and not blocked', () => {
+			const formatter = createResultFormatter({
+				profile: createNumberFormatProfile(NumeralsNumberFormat.Fixed, 'en-US'),
+				unitDisplayPreferences: unitDisplayPreferences(),
+			});
+			const value = math.unit(2000, 'g');
+
+			const formatted = formatter.format(value, undefined, {
+				sourceExpression: '2 kg + 0 g',
+			});
+
+			expect(formatted.text).toBe('2 kg');
+		});
+
+		it('skips blocked explicit units and selects the first compatible candidate', () => {
+			const formatter = createResultFormatter({
+				profile: createNumberFormatProfile(NumeralsNumberFormat.Fixed, 'en-US'),
+				unitDisplayPreferences: unitDisplayPreferences({
+					blockedDisplayUnits: ['kg'],
+					preferredDisplayUnitsByDimension: {
+						...DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION,
+						mass: ['mg', 'g', 'kg'],
+					},
+				}),
+			});
+			const value = math.unit(2000, 'g');
+
+			const formatted = formatter.format(value, undefined, {
+				sourceExpression: '2 kg + 0 g',
+			});
+
+			expect(formatted.text).toBe('2000000 mg');
+		});
+
+		it('falls back to mathjs when no compatible candidate remains', () => {
+			const profile = createNumberFormatProfile(NumeralsNumberFormat.Fixed, 'en-US');
+			const formatter = createResultFormatter({
+				profile,
+				unitDisplayPreferences: unitDisplayPreferences({
+					preferredDisplayUnitsByDimension: {
+						...DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION,
+						mass: [],
+					},
+				}),
+			});
+			const value = math.unit(2000, 'g');
+
+			expect(formatter.format(value).text).toBe(math.format(value, profile.mathjsFormat));
+		});
 	});
 });
 

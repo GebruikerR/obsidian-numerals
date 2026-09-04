@@ -96,7 +96,8 @@ export class TeXRenderer extends BaseLineRenderer {
 	): void {
 		const texResult = context.formatter.format(
 			lineData.result,
-			context.formatOverrides
+			context.formatOverrides,
+			{ sourceExpression: lineData.processedInput }
 		).tex;
 
 		// Render with MathJax

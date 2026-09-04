@@ -2,6 +2,9 @@ import * as math from 'mathjs';
 import {
 	CurrencyDisplayMode,
 	CurrencyPrecisionMode,
+	DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION,
+	type UnitDisplayPreferencesSettings,
+	type UnitPreferenceDimensionMap,
 } from '../numerals.types';
 import type { StringReplaceMap } from '../numerals.types';
 import {
@@ -19,6 +22,7 @@ import type {
 	FormattedResult,
 	CurrencyMatch,
 	NumberFormatProfile,
+	ResultFormatContext,
 	ResultFormatOverrides,
 	ResultFormatter,
 } from './types';
@@ -33,6 +37,7 @@ export interface ResultFormatterConfig {
 	currencyDisplayMode?: CurrencyDisplayMode;
 	/** Legacy TeX conversion applies these source preprocessing rules. */
 	preProcessors?: StringReplaceMap[];
+	unitDisplayPreferences?: UnitDisplayPreferencesSettings;
 }
 
 /** Create the shared formatter used by block, inline, TeX, and insertion paths. */
@@ -48,6 +53,7 @@ class DefaultResultFormatter implements ResultFormatter {
 	private readonly currencies: CurrencyRegistry | undefined;
 	private readonly currencyPrecisionMode: CurrencyPrecisionMode;
 	private readonly currencyDisplayMode: CurrencyDisplayMode;
+	private readonly unitDisplayPreferences: UnitDisplayPreferencesSettings | undefined;
 
 	constructor(config: ResultFormatterConfig) {
 		this.profile = config.profile;
@@ -57,9 +63,14 @@ class DefaultResultFormatter implements ResultFormatter {
 			CurrencyPrecisionMode.CurrencyStandard;
 		this.currencyDisplayMode = config.currencyDisplayMode ??
 			CurrencyDisplayMode.Code;
+		this.unitDisplayPreferences = config.unitDisplayPreferences;
 	}
 
-	format(value: unknown, overrides?: ResultFormatOverrides): FormattedResult {
+	format(
+		value: unknown,
+		overrides?: ResultFormatOverrides,
+		context?: ResultFormatContext
+	): FormattedResult {
 		const profile = resolveNumberFormatProfile(this.profile, overrides);
 		const currency = this.currencies?.match(value);
 		if (currency) {
@@ -67,7 +78,7 @@ class DefaultResultFormatter implements ResultFormatter {
 				return this.formatCurrency(currency, profile, overrides);
 			}
 
-			const legacy = this.formatGeneral(value, profile, overrides);
+			const legacy = this.formatGeneral(value, profile, overrides, context);
 			return {
 				...legacy,
 				// Preserve legacy display while ensuring persisted currency never
@@ -80,7 +91,7 @@ class DefaultResultFormatter implements ResultFormatter {
 			};
 		}
 
-		return this.formatGeneral(value, profile, overrides);
+		return this.formatGeneral(value, profile, overrides, context);
 	}
 
 	private usesCurrencyPresentation(
@@ -94,19 +105,21 @@ class DefaultResultFormatter implements ResultFormatter {
 	private formatGeneral(
 		value: unknown,
 		profile: NumberFormatProfile,
-		overrides?: ResultFormatOverrides
+		overrides?: ResultFormatOverrides,
+		context?: ResultFormatContext
 	): FormattedResult {
+		const displayValue = this.resolveDisplayUnitValue(value, context);
 		const text = formatWithNumberFormatProfile(
-			value,
+			displayValue,
 			profile,
 			overrides?.decimalPlaces
 		);
 
 		const tex = overrides?.decimalPlaces === undefined &&
 			overrides?.numberFormat === undefined
-			? legacyResultToTeX(value, this.preProcessors)
+			? legacyResultToTeX(displayValue, this.preProcessors)
 			: formatOverrideAsTeX(
-				value,
+				displayValue,
 				profile,
 				overrides?.decimalPlaces,
 				this.preProcessors
@@ -118,6 +131,54 @@ class DefaultResultFormatter implements ResultFormatter {
 			// Compatibility path: preserve the PR 1 insertion contract.
 			canonical: text,
 		};
+	}
+
+	private resolveDisplayUnitValue(
+		value: unknown,
+		context?: ResultFormatContext
+	): unknown {
+		if (!math.isUnit(value) || !this.unitDisplayPreferences?.enableCustomDisplayUnitPreferences) {
+			return value;
+		}
+
+		const blockedUnits = toBlockedUnitSet(this.unitDisplayPreferences.blockedDisplayUnits);
+		const explicitUnits = this.unitDisplayPreferences.preserveExplicitInputUnits
+			? extractExplicitUnitTokens(context?.sourceExpression)
+			: [];
+
+		for (const explicitUnit of explicitUnits) {
+			if (blockedUnits.has(explicitUnit.toLowerCase())) {
+				continue;
+			}
+			const converted = tryConvertUnit(value, explicitUnit);
+			if (converted) {
+				return converted;
+			}
+		}
+
+		const dimension = findCompatibleDimension(
+			value,
+			this.unitDisplayPreferences.preferredDisplayUnitsByDimension,
+			this.unitDisplayPreferences.customDisplayUnitsByDimension
+		);
+		if (!dimension) {
+			return value;
+		}
+
+		const candidates = buildDimensionCandidates(
+			dimension,
+			this.unitDisplayPreferences.preferredDisplayUnitsByDimension,
+			this.unitDisplayPreferences.customDisplayUnitsByDimension,
+			blockedUnits
+		);
+		for (const candidate of candidates) {
+			const converted = tryConvertUnit(value, candidate);
+			if (converted) {
+				return converted;
+			}
+		}
+
+		return value;
 	}
 
 	private formatCurrency(
@@ -525,6 +586,107 @@ function numberStringToTeX(value: string): string {
 	const exponential = value.match(/^(.+)[eE]([+-]?\d+)$/u);
 	if (!exponential) {
 		return value;
+	}
+
+	function toBlockedUnitSet(units: readonly string[] | undefined): Set<string> {
+		if (!units) {
+			return new Set<string>();
+		}
+		return new Set(units.map((unit) => unit.toLowerCase()));
+	}
+
+	function extractExplicitUnitTokens(sourceExpression: string | undefined): string[] {
+		if (!sourceExpression) {
+			return [];
+		}
+		const matches = sourceExpression.match(/\b[A-Za-zµ°][A-Za-z0-9µ°]*\b/gu);
+		if (!matches) {
+			return [];
+		}
+
+		const tokens: string[] = [];
+		const seen = new Set<string>();
+		for (const token of matches) {
+			const normalized = token.trim();
+			if (normalized.length === 0) {
+				continue;
+			}
+			const key = normalized.toLowerCase();
+			if (seen.has(key)) {
+				continue;
+			}
+			seen.add(key);
+			tokens.push(normalized);
+		}
+		return tokens;
+	}
+
+	function findCompatibleDimension(
+		value: math.Unit,
+		preferred: UnitPreferenceDimensionMap,
+		custom: UnitPreferenceDimensionMap
+	): string | undefined {
+		const dimensionOrder = new Set<string>([
+			...Object.keys(DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION),
+			...Object.keys(preferred),
+			...Object.keys(custom),
+		]);
+		for (const dimension of dimensionOrder) {
+			const candidates = buildDimensionCandidates(
+				dimension,
+				preferred,
+				custom,
+				new Set()
+			);
+			if (candidates.some((candidate) => canConvertUnit(value, candidate))) {
+				return dimension;
+			}
+		}
+		return undefined;
+	}
+
+	function buildDimensionCandidates(
+		dimension: string,
+		preferred: UnitPreferenceDimensionMap,
+		custom: UnitPreferenceDimensionMap,
+		blockedUnits: ReadonlySet<string>
+	): string[] {
+		const candidates = [
+			...(preferred[dimension] ?? []),
+			...(custom[dimension] ?? []),
+		];
+		const seen = new Set<string>();
+		const output: string[] = [];
+		for (const candidate of candidates) {
+			const trimmed = candidate.trim();
+			if (trimmed.length === 0) {
+				continue;
+			}
+			const key = trimmed.toLowerCase();
+			if (seen.has(key) || blockedUnits.has(key)) {
+				continue;
+			}
+			seen.add(key);
+			output.push(trimmed);
+		}
+		return output;
+	}
+
+	function canConvertUnit(value: math.Unit, targetUnit: string): boolean {
+		try {
+			value.to(targetUnit);
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
+	function tryConvertUnit(value: math.Unit, targetUnit: string): math.Unit | undefined {
+		try {
+			return value.to(targetUnit);
+		} catch {
+			return undefined;
+		}
 	}
 
 	return `${exponential[1]} \\times 10^{${Number(exponential[2])}}`;

@@ -8,11 +8,13 @@ import { htmlToElements } from "./rendering/displayUtils";
 import {
 	CurrencyDisplayMode,
 	CurrencyPrecisionMode,
+	DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION,
 	MAX_CURRENCY_DECIMAL_PLACES,
 	MIN_CURRENCY_DECIMAL_PLACES,
 	NumeralsRenderStyle,
 	NumeralsNumberFormat,
 	NumeralsLayout,
+	type UnitPreferenceDimensionMap,
 } from "./numerals.types";
 
 import {
@@ -85,6 +87,39 @@ function setButtonDisabled(button: ButtonComponent, disabled: boolean): void {
 function setButtonTooltip(button: ButtonComponent, tooltip: string): void {
 	button.buttonEl.title = tooltip;
 	button.buttonEl.setAttribute('aria-label', tooltip);
+}
+
+function parseUnitListInput(value: string): string[] {
+	const units = value
+		.split(',')
+		.map((unit) => unit.trim())
+		.filter((unit) => unit.length > 0);
+	const normalized: string[] = [];
+	const seen = new Set<string>();
+	for (const unit of units) {
+		const key = unit.toLowerCase();
+		if (seen.has(key)) {
+			continue;
+		}
+		seen.add(key);
+		normalized.push(unit);
+	}
+	return normalized;
+}
+
+function formatUnitListInput(units: readonly string[] | undefined): string {
+	return (units ?? []).join(', ');
+}
+
+function setDimensionUnits(
+	settings: UnitPreferenceDimensionMap,
+	dimension: string,
+	units: readonly string[]
+): UnitPreferenceDimensionMap {
+	return {
+		...settings,
+		[dimension]: [...units],
+	};
 }
 
 ///////////////////////////////////////////
@@ -466,6 +501,87 @@ export class NumeralsSettingTab extends PluginSettingTab {
 									
 					});				
 			
+		new Setting(containerEl)
+			.setHeading()
+			.setName('Unit display preferences');
+
+		new Setting(containerEl)
+			.setName('Enable custom display unit preferences')
+			.setDesc('Apply preferred display units by dimension without changing calculation values.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.enableCustomDisplayUnitPreferences)
+				.onChange(async (value) => {
+					this.plugin.settings.enableCustomDisplayUnitPreferences = value;
+					await this.plugin.saveSettings();
+					this.plugin.updateFormatting();
+				}));
+
+		new Setting(containerEl)
+			.setName('Preserve explicit input units')
+			.setDesc('Keep explicitly entered units when they are not blocked.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.preserveExplicitInputUnits)
+				.onChange(async (value) => {
+					this.plugin.settings.preserveExplicitInputUnits = value;
+					await this.plugin.saveSettings();
+					this.plugin.updateFormatting();
+				}));
+
+		for (const [dimension, defaultUnits] of Object.entries(DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION)) {
+			new Setting(containerEl)
+				.setName(`Preferred ${dimension} units`)
+				.setDesc(`Ordered list used for ${dimension} results (comma-separated).`)
+				.addTextArea(text => text
+					.setPlaceholder(formatUnitListInput(defaultUnits))
+					.setValue(formatUnitListInput(
+						this.plugin.settings.preferredDisplayUnitsByDimension[dimension]
+					))
+					.onChange(async (value) => {
+						const units = parseUnitListInput(value);
+						this.plugin.settings.preferredDisplayUnitsByDimension = setDimensionUnits(
+							this.plugin.settings.preferredDisplayUnitsByDimension,
+							dimension,
+							units
+						);
+						await this.plugin.saveSettings();
+						this.plugin.updateFormatting();
+					}));
+		}
+
+		new Setting(containerEl)
+			.setName('Blocked display units')
+			.setDesc('Units in this list are never auto-selected (comma-separated).')
+			.addTextArea(text => text
+				.setPlaceholder('Example: ft, in')
+				.setValue(formatUnitListInput(this.plugin.settings.blockedDisplayUnits))
+				.onChange(async (value) => {
+					const units = parseUnitListInput(value);
+					this.plugin.settings.blockedDisplayUnits = [...units];
+					await this.plugin.saveSettings();
+					this.plugin.updateFormatting();
+				}));
+
+		for (const [dimension] of Object.entries(DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION)) {
+			new Setting(containerEl)
+				.setName(`Custom ${dimension} display units`)
+				.setDesc(`Additional ${dimension} units appended after preferred units (comma-separated).`)
+				.addTextArea(text => text
+					.setPlaceholder('')
+					.setValue(formatUnitListInput(
+						this.plugin.settings.customDisplayUnitsByDimension[dimension]
+					))
+					.onChange(async (value) => {
+						const units = parseUnitListInput(value);
+						this.plugin.settings.customDisplayUnitsByDimension = setDimensionUnits(
+							this.plugin.settings.customDisplayUnitsByDimension,
+							dimension,
+							units
+						);
+						await this.plugin.saveSettings();
+						this.plugin.updateFormatting();
+					}));
+		}
+
 		new Setting(containerEl)
 		.setHeading()
 		.setName('Obsidian integration');	

@@ -68,6 +68,24 @@ interface CurrencySymbolMapping {
 	currency: string; // ISO 4217 Currency Code
 }
 
+export type UnitPreferenceDimensionMap = Record<string, string[]>;
+
+export const DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION: Readonly<UnitPreferenceDimensionMap> = Object.freeze({
+	mass: Object.freeze(['t', 'kg', 'g', 'mg']),
+	length: Object.freeze(['m', 'km', 'mm', 'cm']),
+	force: Object.freeze(['kN', 'N']),
+	time: Object.freeze(['s', 'ms']),
+	volume: Object.freeze(['L', 'mL']),
+});
+
+export interface UnitDisplayPreferencesSettings {
+	enableCustomDisplayUnitPreferences: boolean;
+	preserveExplicitInputUnits: boolean;
+	preferredDisplayUnitsByDimension: UnitPreferenceDimensionMap;
+	blockedDisplayUnits: string[];
+	customDisplayUnitsByDimension: UnitPreferenceDimensionMap;
+}
+
 export interface NumeralsSettings {
 	resultSeparator: string;
 	layoutStyle: NumeralsLayout;
@@ -83,6 +101,11 @@ export interface NumeralsSettings {
 	currencyPrecisionMode: CurrencyPrecisionMode;
 	currencyDisplayMode: CurrencyDisplayMode;
 	customCurrencyDecimalPlaces: number;
+	enableCustomDisplayUnitPreferences: boolean;
+	preserveExplicitInputUnits: boolean;
+	preferredDisplayUnitsByDimension: UnitPreferenceDimensionMap;
+	blockedDisplayUnits: string[];
+	customDisplayUnitsByDimension: UnitPreferenceDimensionMap;
 	forceProcessAllFrontmatter: boolean;
 	customCurrencySymbol: CurrencyType | null;
 	enableGreekAutoComplete: boolean;
@@ -114,6 +137,11 @@ export const DEFAULT_SETTINGS: NumeralsSettings = {
 	currencyPrecisionMode: 			CurrencyPrecisionMode.CurrencyStandard,
 	currencyDisplayMode: 			CurrencyDisplayMode.Code,
 	customCurrencyDecimalPlaces: 	2,
+	enableCustomDisplayUnitPreferences:	false,
+	preserveExplicitInputUnits:			true,
+	preferredDisplayUnitsByDimension:	cloneDimensionMap(DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION),
+	blockedDisplayUnits:				[],
+	customDisplayUnitsByDimension:		{},
 	forceProcessAllFrontmatter: 		false,
 	customCurrencySymbol: 				null,
 	enableGreekAutoComplete: 			true,
@@ -176,12 +204,181 @@ export function normalizeCurrencyFormattingSettings(
 	return changed;
 }
 
+export function normalizeUnitDisplayPreferencesSettings(
+	data: Record<string, unknown>
+): boolean {
+	let changed = false;
+	const hasOwn = (key: string): boolean => Object.prototype.hasOwnProperty.call(data, key);
+
+	if (
+		hasOwn('enableCustomDisplayUnitPreferences') &&
+		typeof data['enableCustomDisplayUnitPreferences'] !== 'boolean'
+	) {
+		data['enableCustomDisplayUnitPreferences'] =
+			DEFAULT_SETTINGS.enableCustomDisplayUnitPreferences;
+		changed = true;
+	}
+
+	if (
+		hasOwn('preserveExplicitInputUnits') &&
+		typeof data['preserveExplicitInputUnits'] !== 'boolean'
+	) {
+		data['preserveExplicitInputUnits'] = DEFAULT_SETTINGS.preserveExplicitInputUnits;
+		changed = true;
+	}
+
+	if (hasOwn('blockedDisplayUnits')) {
+		const normalized = normalizeUnitList(data['blockedDisplayUnits']);
+		if (normalized === undefined) {
+			data['blockedDisplayUnits'] = [...DEFAULT_SETTINGS.blockedDisplayUnits];
+			changed = true;
+		} else if (!areUnitListsEqual(data['blockedDisplayUnits'], normalized)) {
+			data['blockedDisplayUnits'] = normalized;
+			changed = true;
+		}
+	}
+
+	if (hasOwn('preferredDisplayUnitsByDimension')) {
+		const normalized = normalizeDimensionMap(
+			data['preferredDisplayUnitsByDimension'],
+			cloneDimensionMap(DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION)
+		);
+		if (normalized === undefined) {
+			data['preferredDisplayUnitsByDimension'] =
+				cloneDimensionMap(DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION);
+			changed = true;
+		} else if (!areDimensionMapsEqual(data['preferredDisplayUnitsByDimension'], normalized)) {
+			data['preferredDisplayUnitsByDimension'] = normalized;
+			changed = true;
+		}
+	}
+
+	if (hasOwn('customDisplayUnitsByDimension')) {
+		const normalized = normalizeDimensionMap(
+			data['customDisplayUnitsByDimension'],
+			{}
+		);
+		if (normalized === undefined) {
+			data['customDisplayUnitsByDimension'] = {};
+			changed = true;
+		} else if (!areDimensionMapsEqual(data['customDisplayUnitsByDimension'], normalized)) {
+			data['customDisplayUnitsByDimension'] = normalized;
+			changed = true;
+		}
+	}
+
+	return changed;
+}
+
 
 export interface CurrencyType {
 	symbol: string;
 	unicode: string;
 	name: string;
 	currency: string;
+}
+
+function cloneDimensionMap(
+	map: Readonly<Record<string, readonly string[]>>
+): UnitPreferenceDimensionMap {
+	const clone: UnitPreferenceDimensionMap = {};
+	for (const [dimension, units] of Object.entries(map)) {
+		clone[dimension] = [...units];
+	}
+	return clone;
+}
+
+function normalizeUnitList(value: unknown): string[] | undefined {
+	const raw = Array.isArray(value)
+		? value
+		: typeof value === 'string'
+			? value.split(',')
+			: undefined;
+	if (!raw) {
+		return undefined;
+	}
+
+	const normalized: string[] = [];
+	const seen = new Set<string>();
+	for (const item of raw) {
+		if (typeof item !== 'string') {
+			return undefined;
+		}
+		const trimmed = item.trim();
+		if (trimmed.length === 0) {
+			continue;
+		}
+		const dedupeKey = trimmed.toLowerCase();
+		if (seen.has(dedupeKey)) {
+			continue;
+		}
+		seen.add(dedupeKey);
+		normalized.push(trimmed);
+	}
+
+	return normalized;
+}
+
+function normalizeDimensionMap(
+	value: unknown,
+	fallback: UnitPreferenceDimensionMap
+): UnitPreferenceDimensionMap | undefined {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) {
+		return undefined;
+	}
+
+	const normalized = cloneDimensionMap(fallback);
+	for (const [rawDimension, rawUnits] of Object.entries(value)) {
+		const dimension = rawDimension.trim();
+		if (dimension.length === 0) {
+			continue;
+		}
+		const parsedUnits = normalizeUnitList(rawUnits);
+		if (parsedUnits === undefined) {
+			return undefined;
+		}
+		normalized[dimension] = parsedUnits;
+	}
+
+	return normalized;
+}
+
+function areUnitListsEqual(value: unknown, expected: string[]): boolean {
+	if (!Array.isArray(value) || value.length !== expected.length) {
+		return false;
+	}
+	for (let i = 0; i < value.length; i++) {
+		if (value[i] !== expected[i]) {
+			return false;
+		}
+	}
+	return true;
+}
+
+function areDimensionMapsEqual(
+	value: unknown,
+	expected: UnitPreferenceDimensionMap
+): boolean {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) {
+		return false;
+	}
+	const recordValue = value as Record<string, unknown>;
+	const valueKeys = Object.keys(recordValue).sort();
+	const expectedKeys = Object.keys(expected).sort();
+	if (valueKeys.length !== expectedKeys.length) {
+		return false;
+	}
+	for (let i = 0; i < valueKeys.length; i++) {
+		if (valueKeys[i] !== expectedKeys[i]) {
+			return false;
+		}
+	}
+	for (const key of expectedKeys) {
+		if (!areUnitListsEqual(recordValue[key], expected[key])) {
+			return false;
+		}
+	}
+	return true;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

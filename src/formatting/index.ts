@@ -14,6 +14,7 @@ export type {
 	CurrencyMatch,
 	FormattedResult,
 	NumberFormatProfile,
+	ResultFormatContext,
 	ResultFormatOverrides,
 	ResultFormatter,
 } from './types';

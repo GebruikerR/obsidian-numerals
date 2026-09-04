@@ -91,7 +91,8 @@ export abstract class BaseLineRenderer implements ILineRenderer {
 			context.settings.resultSeparator +
 			context.formatter.format(
 				lineData.result,
-				context.formatOverrides
+				context.formatOverrides,
+				{ sourceExpression: lineData.processedInput }
 			).text;
 		resultElement.setText(formattedResult);
 	}

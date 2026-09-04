@@ -21,6 +21,8 @@ import {
 	NumeralsScope,
 	StringReplaceMap,
 	normalizeCurrencyFormattingSettings,
+	normalizeUnitDisplayPreferencesSettings,
+	DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION,
 } from "./numerals.types";
 import {
 	NumeralsSettingTab,
@@ -301,6 +303,10 @@ export default class NumeralsPlugin extends Plugin {
 				console.warn('Numerals: Repaired invalid currency formatting settings');
 				shouldSaveSettings = true;
 			}
+			if (normalizeUnitDisplayPreferencesSettings(loadData)) {
+				console.warn('Numerals: Repaired invalid unit display preference settings');
+				shouldSaveSettings = true;
+			}
 
 			// Check for signature of old setting format, then port to new setting format
 			if (loadData.layoutStyle == undefined) {
@@ -337,6 +343,14 @@ export default class NumeralsPlugin extends Plugin {
 		}
 
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, loadData);
+		this.settings.preferredDisplayUnitsByDimension = {
+			...cloneDimensionMap(DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION),
+			...(loadData?.preferredDisplayUnitsByDimension ?? {}),
+		};
+		this.settings.customDisplayUnitsByDimension = cloneDimensionMap(
+			loadData?.customDisplayUnitsByDimension ?? {}
+		);
+		this.settings.blockedDisplayUnits = [...(loadData?.blockedDisplayUnits ?? [])];
 		if (shouldSaveSettings) {
 			await this.saveSettings();
 		}
@@ -366,6 +380,28 @@ export default class NumeralsPlugin extends Plugin {
 				CurrencyPrecisionMode.CurrencyStandard,
 			currencyDisplayMode: this.settings.currencyDisplayMode ??
 				CurrencyDisplayMode.Code,
+			unitDisplayPreferences: {
+				enableCustomDisplayUnitPreferences:
+					this.settings.enableCustomDisplayUnitPreferences,
+				preserveExplicitInputUnits: this.settings.preserveExplicitInputUnits,
+				preferredDisplayUnitsByDimension: cloneDimensionMap(
+					this.settings.preferredDisplayUnitsByDimension
+				),
+				blockedDisplayUnits: [...this.settings.blockedDisplayUnits],
+				customDisplayUnitsByDimension: cloneDimensionMap(
+					this.settings.customDisplayUnitsByDimension
+				),
+			},
 		});
 	}
+}
+
+function cloneDimensionMap(
+	map: Readonly<Record<string, readonly string[]>>
+): Record<string, string[]> {
+	const clone: Record<string, string[]> = {};
+	for (const [dimension, units] of Object.entries(map)) {
+		clone[dimension] = [...units];
+	}
+	return clone;
 }

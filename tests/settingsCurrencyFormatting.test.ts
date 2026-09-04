@@ -1,10 +1,12 @@
 import {
 	CurrencyDisplayMode,
 	CurrencyPrecisionMode,
+	DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION,
 	DEFAULT_SETTINGS,
 	MAX_CURRENCY_DECIMAL_PLACES,
 	MIN_CURRENCY_DECIMAL_PLACES,
 	normalizeCurrencyFormattingSettings,
+	normalizeUnitDisplayPreferencesSettings,
 } from '../src/numerals.types';
 
 describe('currency formatting settings', () => {
@@ -14,6 +16,13 @@ describe('currency formatting settings', () => {
 		);
 		expect(DEFAULT_SETTINGS.currencyDisplayMode).toBe(CurrencyDisplayMode.Code);
 		expect(DEFAULT_SETTINGS.customCurrencyDecimalPlaces).toBe(2);
+		expect(DEFAULT_SETTINGS.enableCustomDisplayUnitPreferences).toBe(false);
+		expect(DEFAULT_SETTINGS.preserveExplicitInputUnits).toBe(true);
+		expect(DEFAULT_SETTINGS.preferredDisplayUnitsByDimension).toEqual(
+			DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION
+		);
+		expect(DEFAULT_SETTINGS.blockedDisplayUnits).toEqual([]);
+		expect(DEFAULT_SETTINGS.customDisplayUnitsByDimension).toEqual({});
 	});
 
 	it('does not rewrite an older settings object with missing properties', () => {
@@ -75,6 +84,53 @@ describe('currency formatting settings', () => {
 			currencyDisplayMode: CurrencyDisplayMode.Code,
 			customCurrencyDecimalPlaces: 4,
 			unrelated: true,
+		});
+	});
+
+	it('normalizes persisted unit display preferences lists', () => {
+		const data: Record<string, unknown> = {
+			enableCustomDisplayUnitPreferences: true,
+			preserveExplicitInputUnits: false,
+			preferredDisplayUnitsByDimension: {
+				mass: [' kg ', 'g', 'KG', '', 'mg'],
+			},
+			blockedDisplayUnits: [' ft ', 'FT', '', 'in'],
+			customDisplayUnitsByDimension: {
+				length: [' yd', 'yd', 'mi '],
+			},
+		};
+
+		expect(normalizeUnitDisplayPreferencesSettings(data)).toBe(true);
+		expect(data).toEqual({
+			enableCustomDisplayUnitPreferences: true,
+			preserveExplicitInputUnits: false,
+			preferredDisplayUnitsByDimension: {
+				...DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION,
+				mass: ['kg', 'g', 'mg'],
+			},
+			blockedDisplayUnits: ['ft', 'in'],
+			customDisplayUnitsByDimension: {
+				length: ['yd', 'mi'],
+			},
+		});
+	});
+
+	it('repairs invalid unit display preference payloads', () => {
+		const data: Record<string, unknown> = {
+			enableCustomDisplayUnitPreferences: 'yes',
+			preserveExplicitInputUnits: 1,
+			preferredDisplayUnitsByDimension: ['kg', 'g'],
+			blockedDisplayUnits: [1, 2],
+			customDisplayUnitsByDimension: 'length=km',
+		};
+
+		expect(normalizeUnitDisplayPreferencesSettings(data)).toBe(true);
+		expect(data).toEqual({
+			enableCustomDisplayUnitPreferences: false,
+			preserveExplicitInputUnits: true,
+			preferredDisplayUnitsByDimension: DEFAULT_PREFERRED_DISPLAY_UNITS_BY_DIMENSION,
+			blockedDisplayUnits: [],
+			customDisplayUnitsByDimension: {},
 		});
 	});
 });

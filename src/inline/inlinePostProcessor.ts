@@ -159,7 +159,9 @@ function processInlineCodeElement(
 			sourcePath,
 			settings,
 		);
-		const formattedResult = formatter.format(result.raw);
+		const formattedResult = formatter.format(result.raw, undefined, {
+			sourceExpression: parsed.expression,
+		});
 		prevResultRef.value = result.raw;
 
 		// Propagate $-prefixed globals for note-wide visibility

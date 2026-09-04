@@ -367,7 +367,9 @@ function tryBuildNodeDecoration(
 			ctx.filePath,
 			ctx.settings,
 		);
-		formattedResult = ctx.formatter.format(result.raw);
+		formattedResult = ctx.formatter.format(result.raw, undefined, {
+			sourceExpression: parsed.expression,
+		});
 		processedExpression = result.processedExpression;
 		prevResultRef.value = result.raw;
 		for (const path of result.referencedPaths) {

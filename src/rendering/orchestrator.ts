@@ -152,7 +152,9 @@ export function handleResultInsertions(
 
 		const curLine = lineStart + i + 1;
 		const sourceLine = editor.getLine(curLine);
-		const insertionValue = formatter.format(results[i], formatOverrides).canonical;
+		const insertionValue = formatter.format(results[i], formatOverrides, {
+			sourceExpression: sourceLine,
+		}).canonical;
 
 		// Replace @[variable] or @[variable::oldValue] with @[variable::newValue]
 		const modifiedSource = sourceLine.replace(
