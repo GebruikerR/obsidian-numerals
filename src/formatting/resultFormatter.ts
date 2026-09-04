@@ -610,7 +610,7 @@ function extractExplicitUnitTokens(sourceExpression: string | undefined): string
 	if (!sourceExpression) {
 		return [];
 	}
-	const numericUnitPattern = /(?:^|[^\w])(?:\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*([A-Za-zµ°][A-Za-z0-9µ°]*)\b/gu;
+	const numericUnitPattern = /(?:^|[^\w])(?:(?:\d+(?:\.\d+)?)|(?:\.\d+))(?:[eE][+-]?\d+)?\s*([A-Za-zµ°][A-Za-z0-9µ°]*)\b/gu;
 	const conversionTargetPattern = /\b(?:to|in)\s+([A-Za-zµ°][A-Za-z0-9µ°]*)\b/giu;
 	return collectOrderedUnitMatches(
 		sourceExpression,
